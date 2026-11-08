@@ -1,0 +1,533 @@
+<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"><title>Нефтяной Олигарх</title><script src="src/lib/vk-bridge.min.js"></script><script src="src/lib/three.min.js"></script><script src="src/lib/OrbitControls.js"></script><link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛢️</text></svg>"><link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css"></head><body><div id="game-app"><header id="hud">
+    <div class="hud-top-bar">
+      <!-- ROW 1: PRIMARY STATS & DISPATCH BUTTON (TOP RIGHT) -->
+      <div class="hud-right-gp-stats">
+        <div class="hud-pills-cluster">
+          <div class="gp-stat-pill balance-pill" title="Капитал промысла">
+            <span class="gp-pill-icon">🪙</span>
+            <span id="stat-money" class="gp-pill-val gold-text">0 ₽</span>
+            <button id="btn-quick-plus" class="btn-stat-plus" type="button" title="Удвоение дебита">+</button>
+          </div>
+          <div class="gp-stat-pill flow-pill" title="Дебит скважин">
+            <span class="gp-pill-icon">📈</span>
+            <span id="stat-income-rate" class="gp-pill-val neon-cyan">0 ₽/с</span>
+          </div>
+          <div class="gp-stat-pill star-pill" title="Звёзды / PetroCoin">
+            <span class="gp-pill-icon">⭐</span>
+            <span id="stat-crypto" class="gp-pill-val purple-text">0</span>
+            <button id="btn-quick-star-plus" class="btn-stat-plus" type="button" title="Майнинг-ферма">+</button>
+          </div>
+          <span id="stat-dollars" class="hidden">$0</span>
+        </div>
+        
+      </div>
+
+      <!-- ROW 2: UTILITY CONTROLS & SPECIALIZATION / COMPANY BADGES -->
+      <div class="hud-controls-row">
+        <div class="hud-left-controls">
+          <button id="btn-settings-toggle" class="btn-icon btn-gear" type="button" title="Настройки"><span class="btn-icon-symbol">⚙️</span></button>
+          <button id="btn-open-dispatch" class="btn-dispatch-hud" type="button" title="Пульт управления промыслом">
+          <span class="dispatch-hud-icon">🎛️</span>
+          <span class="dispatch-hud-text">ПУЛЬТ</span>
+        </button>
+          <button id="btn-open-industrial" class="btn-icon" type="button" title="Промышленный сектор: НПЗ, ГПЗ, НГХК, РВС"><span class="btn-icon-symbol">🏭</span></button>
+          <button id="btn-open-contracts" class="btn-icon" type="button" title="Доска региональных контрактов СМП"><span class="btn-icon-symbol">📋</span></button>
+          <button id="btn-open-settlement" class="btn-icon" type="button" title="Вахтовый посёлок «Северная Звезда»"><span class="btn-icon-symbol">🏠</span></button>
+          <button id="btn-open-megaproject" class="btn-icon" type="button" title="Мегапроект «Ямал-СПГ» и Полярные Сезоны"><span class="btn-icon-symbol">🏆</span></button>
+          <button id="btn-open-marine" class="btn-icon" type="button" title="Морской терминал и Танкер Arc7"><span class="btn-icon-symbol">🚢</span></button>
+          <button id="btn-market-trigger" class="btn-icon" type="button" title="Маркетплейс"><span class="btn-icon-symbol">🛒</span></button>
+          <button id="btn-boost" class="btn-boost-pulse" type="button" title="Буст дебита"><span class="boost-hud-icon">⚡</span><span class="boost-hud-text">x3</span></button>
+          <button id="btn-ipo-trigger" class="btn-ipo-hud hidden" type="button" aria-label="Выход на IPO" title="Выход на IPO"><span class="ipo-hud-icon">🏛️</span><span class="ipo-hud-text">IPO</span></button>
+          <button id="btn-favorite" class="btn-icon hidden" type="button">⭐</button>
+          <button id="btn-streak-trigger" class="btn-icon hidden" type="button">🎁</button>
+          <div id="hud-company-container" class="badge hud-company-badge hidden" title="Биржевой терминал" role="button" tabindex="0"><span id="hud-company-name" class="hud-company-marquee"></span></div>
+          <div id="hud-spec-badge" class="badge spec-hud-badge hidden" title="Специализация" role="button" tabindex="0"><span id="hud-spec-icon" class="spec-hud-icon">🛢️</span><span id="hud-spec-name" class="spec-hud-name">НЕФТЬ</span><span id="hud-spec-buff" class="spec-hud-buff">x2.5</span></div>
+        </div>
+      </div>
+    </div>
+    <div id="savelich-quest-banner" class="savelich-quest-banner"><div class="quest-track-bar"><div id="quest-progress-fill" class="quest-progress-fill" style="width: 0%;"></div></div><div class="quest-body"><button id="btn-claim-quest" class="btn-claim-quest" type="button" disabled><span class="claim-icon">🔒</span><span>НАГРАДА</span><span class="claim-amt">500 ₽</span></button><div class="quest-info-group"><div class="quest-title-marquee-wrapper" id="quest-title-marquee-wrapper">
+        <div class="quest-title-marquee-track" id="quest-title-track">
+          <span id="quest-title-text" class="quest-title-text">Добудьте первые 5 порций газа</span>
+          <span class="quest-title-sep" id="quest-title-sep" aria-hidden="true"> • </span>
+          <span id="quest-title-text-clone" class="quest-title-text quest-title-clone" aria-hidden="true">Добудьте первые 5 порций газа</span>
+          <span class="quest-title-sep" id="quest-title-sep-2" aria-hidden="true"> • </span>
+        </div>
+      </div><span id="quest-counter-text" class="quest-counter-text">0/5</span></div><button id="btn-open-savelich" class="btn-savelich-badge" type="button" title="Бригадир Савельич (нажмите для прокачки)"><span class="savelich-avatar">👷‍♂️</span><span class="savelich-tag">САВЕЛЬИЧ</span></button></div></div><div id="boost-indicator" class="boost-indicator hidden"><span class="boost-text">🔥 x3</span><span id="boost-timer" class="boost-timer">120с</span><div class="boost-bar-track"><div id="boost-bar-fill" class="boost-bar-fill"></div></div></div></header><div id="news-ticker" class="news-ticker-bar state-default" role="button" tabindex="0" aria-label="Биржа"><div class="ticker-badge-container"><span id="ticker-badge" class="ticker-badge badge-geopolitics">ГЕОПОЛИТИКА</span></div><div class="ticker-marquee-wrapper" id="ticker-marquee-wrapper"><div class="ticker-marquee-track" id="ticker-marquee-track"><span id="ticker-headline" class="ticker-headline">Brent / TTF</span><span class="ticker-separator" aria-hidden="true"> + </span><span id="ticker-headline-clone" class="ticker-headline ticker-headline-clone" aria-hidden="true">Brent / TTF</span><span class="ticker-separator" aria-hidden="true"> + </span></div></div><div class="ticker-action-container"><button id="btn-ticker-broker" class="btn-ticker-broker" type="button" title="Инсайд x2.5" aria-label="Инсайд брокера x2.5"><span class="broker-icon">📈</span><span id="ticker-broker-text" class="broker-text">x2.5</span><span class="broker-ad-tag">🎬</span></button></div></div><section id="rig-stage" class="stage-container"><canvas id="oil-canvas"></canvas><div class="stage-3d-controls"><button id="btn-3d-cam" class="btn-3d-pill" title="Режим камеры">📐 Изо</button><button id="btn-3d-labels" class="btn-3d-pill" title="Режим плашек">🏷️ Метки</button><button id="btn-3d-night" class="btn-3d-pill" title="Освещение День/Ночь">☀️ День</button><button id="btn-3d-reset" class="btn-3d-pill" title="Центрировать поле">🎯 Центр</button></div><div class="rig-info-plate"><span id="active-well-name" class="rig-name"></span><span id="active-well-stat" class="rig-desc"></span></div></section><main id="management-panel" class="collapsed"><div class="panel-header"><span class="panel-title">🎛️ Пульт Управления</span><button id="btn-toggle-panel" class="btn-drawer-toggle" title="Свернуть / развернуть панель">▲ Пульт</button></div><div class="dispatcher-tabs"><button class="btn-dispatch-tab active" data-tab="logistics" type="button">🚚 Логистика &amp; Слив</button><button class="btn-dispatch-tab" data-tab="crew" type="button">👷 Бригада &amp; Вахта</button><button class="btn-dispatch-tab" data-tab="summary" type="button">📊 Сводка</button><button class="btn-dispatch-tab" data-tab="contracts" type="button">📋 Контракты</button></div><div id="dispatcher-content" class="dispatcher-content"></div><div id="wells-list" class="wells-scroll-container hidden"></div></main><div id="well-upgrade-sheet" class="well-upgrade-sheet hidden" role="dialog" aria-labelledby="sheet-well-name"><div class="sheet-drag-handle"></div><div class="sheet-header"><div class="sheet-title-group"><span id="sheet-well-badge" class="sheet-well-badge">Куст №1</span><h3 id="sheet-well-name" class="sheet-well-name">Скважина №1 «Пионер»</h3></div><button id="btn-close-well-sheet" class="btn-sheet-close" type="button" aria-label="Закрыть">✕</button></div><div class="sheet-stats-row"><div class="sheet-stat-box"><span class="sheet-stat-label">Текущий дебит</span><span id="sheet-current-debit" class="sheet-stat-val cyan-text">+45 ₽/сек</span></div><div class="sheet-arrow">➔</div><div class="sheet-stat-box"><span class="sheet-stat-label">После улучшения</span><span id="sheet-next-debit" class="sheet-stat-val green-text">+57 ₽/сек</span></div></div><div class="sheet-actions"><button id="btn-sheet-upgrade" class="btn-sheet-upgrade" type="button"><span class="sheet-btn-action-text">+1 УРОВЕНЬ</span><span id="sheet-upgrade-cost" class="sheet-btn-cost">993 ₽</span></button><button id="btn-sheet-valve-mini" class="btn-sheet-valve" type="button" title="Техобслуживание и калибровка"><span>⚙️ КАЛИБРОВКА</span></button><button id="btn-sheet-block-blast" class="btn-sheet-valve btn-blast-action" type="button" title="Сборка коллектора и очистка гидратов (Block Blast)"><span>🧩 ПРОДУВКА (BLOCK BLAST)</span></button><button id="btn-sheet-geonav" class="btn-sheet-valve well-sheet-btn" type="button" title="Геонавигация и гидроразрыв пласта (ГРП)"><span>🧭 ГЕОНАВИГАЦИЯ &amp; ГРП</span></button></div></div><div id="facility-upgrade-sheet" class="well-upgrade-sheet hidden" role="dialog" aria-labelledby="sheet-facility-name"><div class="sheet-drag-handle"></div><div class="sheet-header"><div class="sheet-title-group"><span id="sheet-facility-badge" class="sheet-well-badge">УКПГ</span><h3 id="sheet-facility-name" class="sheet-well-name">Газовый промысел (Ур. 1)</h3></div><button id="btn-close-facility-sheet" class="btn-sheet-close" type="button" aria-label="Закрыть">✕</button></div><div class="sheet-stats-row"><div class="sheet-stat-box"><span class="sheet-stat-label">Дебит всех кустов</span><span id="sheet-facility-current-bonus" class="sheet-stat-val cyan-text">+15%</span></div><div class="sheet-arrow">➔</div><div class="sheet-stat-box"><span class="sheet-stat-label">После улучшения</span><span id="sheet-facility-next-bonus" class="sheet-stat-val green-text">+30%</span></div></div><div class="sheet-stats-row second-row"><div class="sheet-stat-box"><span class="sheet-stat-label">Буфер конденсата</span><span id="sheet-facility-capacity" class="sheet-stat-val gold-text">2 000 ед.</span></div><div class="sheet-stat-box"><span class="sheet-stat-label">В наличии</span><span id="sheet-facility-stored" class="sheet-stat-val cyan-text">0 ед.</span></div></div><div class="sheet-actions"><button id="btn-facility-upgrade" class="btn-sheet-upgrade" type="button"><span id="facility-btn-action-text" class="sheet-btn-action-text">+1 УРОВЕНЬ ПРОМЫСЛА</span><span id="sheet-facility-cost" class="sheet-btn-cost">50 000 ₽</span></button><button id="btn-facility-sell-reserves" class="btn-sheet-valve" type="button" title="Продать накопленный конденсат"><span>💰 СЛИВ БУФЕРА</span></button></div></div><div id="canteen-upgrade-sheet" class="well-upgrade-sheet hidden" role="dialog" aria-labelledby="sheet-canteen-name"><div class="sheet-drag-handle"></div><div class="sheet-header"><div class="sheet-title-group"><span id="sheet-canteen-badge" class="sheet-well-badge">ВАХТА</span><h3 id="sheet-canteen-name" class="sheet-well-name">Вахтовый городок &amp; Столовая (Ур. 1)</h3></div><button id="btn-close-canteen-sheet" class="btn-sheet-close" type="button" aria-label="Закрыть">✕</button></div><div class="sheet-stats-row"><div class="sheet-stat-box"><span class="sheet-stat-label">Синергия рабочих</span><span id="sheet-canteen-current-bonus" class="sheet-stat-val cyan-text">+0%</span></div><div class="sheet-arrow">➔</div><div class="sheet-stat-box"><span class="sheet-stat-label">После улучшения</span><span id="sheet-canteen-next-bonus" class="sheet-stat-val green-text">+15%</span></div></div><div class="sheet-actions single"><button id="btn-canteen-upgrade" class="btn-sheet-upgrade" type="button"><span id="canteen-btn-action-text" class="sheet-btn-action-text">+1 УРОВЕНЬ ГОРОДКА</span><span id="sheet-canteen-cost" class="sheet-btn-cost">15 000 ₽</span></button></div></div><div id="garage-upgrade-sheet" class="well-upgrade-sheet hidden" role="dialog" aria-labelledby="sheet-garage-name"><div class="sheet-drag-handle"></div><div class="sheet-header"><div class="sheet-title-group"><span id="sheet-garage-badge" class="sheet-well-badge" style="background:#f59e0b;color:#000;">АТБ</span><h3 id="sheet-garage-name" class="sheet-well-name">Гараж техники (АТБ) (Ур. 1)</h3></div><button id="btn-close-garage-sheet" class="btn-sheet-close" type="button" aria-label="Закрыть">✕</button></div><div class="sheet-stats-row"><div class="sheet-stat-box"><span class="sheet-stat-label">Парк ТРЭКОЛ 6х6</span><span id="sheet-garage-current-rovers" class="sheet-stat-val cyan-text">1 машина</span></div><div class="sheet-arrow">➔</div><div class="sheet-stat-box"><span class="sheet-stat-label">После улучшения</span><span id="sheet-garage-next-rovers" class="sheet-stat-val green-text">2 машины (+ППР)</span></div></div><div class="sheet-actions single"><button id="btn-garage-upgrade" class="btn-sheet-upgrade" type="button"><span id="garage-btn-action-text" class="sheet-btn-action-text">+1 БОКС / ПОКУПКА ТРЭКОЛА</span><span id="sheet-garage-cost" class="sheet-btn-cost">35 000 ₽</span></button></div></div><div id="modal-well-tuning" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="tuning-modal-title"><div class="modal-card modal-tuning-card"><div class="modal-header"><div class="modal-badge-stage badge-spec" id="tuning-well-badge">КУСТ 1</div><h2 id="tuning-modal-title">ТЕХОБСЛУЖИВАНИЕ</h2><p class="modal-subtitle" id="tuning-modal-subtitle">Мини-игры калибровки оборудования (+100% к дебиту куста)</p></div><div class="tuning-tabs"><button class="tuning-tab-btn active" data-tab="valve" id="tab-tuning-valve" type="button">⚙️ Задвижка</button><button class="tuning-tab-btn" data-tab="purge" id="tab-tuning-purge" type="button">💨 Продувка</button><button class="tuning-tab-btn" data-tab="sensor" id="tab-tuning-sensor" type="button">📡 Расходомер</button></div><div id="game-panel-valve" class="tuning-game-panel"><div class="game-instruction-bar"><span>Поймайте стрелку манометра в зелёной зоне (160–200 атм):</span></div><div class="manometer-display"><canvas id="manometer-canvas" width="280" height="110"></canvas></div><div class="tuning-progress-row"><span>Обороты маховика:</span><div id="valve-turns-indicator" class="turns-indicator"><span class="turn-dot" id="turn-dot-0"></span><span class="turn-dot" id="turn-dot-1"></span><span class="turn-dot" id="turn-dot-2"></span></div></div><button id="btn-action-valve-turn" class="btn-primary-ipo" type="button"><span class="ipo-btn-icon">⚙️</span><span class="ipo-btn-title">ПОВЕРНУТЬ МАХОВИК</span></button></div><div id="game-panel-purge" class="tuning-game-panel hidden"><div class="game-instruction-bar"><span>Быстро тапайте дренаж для очистки шлейфа от пробки гидратов:</span></div><div class="purge-progress-box"><div class="purge-status-row"><span>Очистка шлейфа:</span><span id="purge-pct-label" class="cyan-text font-bold">0%</span></div><div class="purge-track"><div id="purge-bar-fill" class="purge-bar-fill" style="width: 0%;"></div></div><div class="purge-timer-row"><span>Время продувки:</span><span id="purge-timer-label" class="gold-text font-bold">10.0с</span></div></div><button id="btn-action-purge-tap" class="btn-primary-ipo" type="button"><span class="ipo-btn-icon">💨</span><span class="ipo-btn-title">ПРОДУТЬ ДРЕНАЖ</span></button></div><div id="game-panel-sensor" class="tuning-game-panel hidden"><div class="game-instruction-bar"><span>Установите частоту ультразвукового датчика в резонанс (433 ± 4 МГц):</span></div><div class="sensor-slider-box"><div class="sensor-freq-row"><span>Частота:</span><span id="sensor-freq-label" class="cyan-text font-bold">410 МГц</span><span id="sensor-status-badge" class="badge-status badge-status-warn">РАССИНХРОН</span></div><input type="range" id="sensor-freq-slider" min="400" max="460" value="410" step="1" class="sensor-range-slider"><div class="sensor-target-hint">🎯 Рабочая полоса: 429 ... 437 МГц</div></div><button id="btn-action-sensor-sync" class="btn-primary-ipo" type="button" disabled><span class="ipo-btn-icon">📡</span><span class="ipo-btn-title">СИНХРОНИЗИРОВАТЬ ДАТЧИК</span></button></div><div class="well-mastery-footer"><div class="mastery-summary"><span>Мастерство куста:</span><span id="tuning-mastery-pct" class="gold-text font-bold">+0% дебит</span></div><div class="mastery-badges-row"><span id="badge-mastery-valve" class="mastery-badge">⚙️ Задвижка: +25%</span><span id="badge-mastery-purge" class="mastery-badge">💨 Продувка: +25%</span><span id="badge-mastery-sensor" class="mastery-badge">📡 Датчик: +25%</span></div></div><div class="modal-actions single"><button id="btn-close-tuning-modal" class="btn-secondary" type="button">Закрыть</button></div></div></div><div id="modal-offline" class="modal-backdrop hidden"><div class="modal-card"><div class="modal-header"><div class="modal-icon-badge">🛢️</div><h2>Офлайн</h2></div><div class="offline-reward-box"><div class="offline-time-spent" id="offline-time-label"></div><div class="offline-amount gold-text" id="offline-money-label"></div></div><div class="modal-actions"><button id="btn-offline-double" class="btn-primary-ad"><span class="ad-icon">🎬</span><span class="btn-text-strong">Удвоить</span><span id="double-amount-tag" class="ad-reward-tag">90к ₽</span></button><button id="btn-offline-claim" class="btn-secondary"><span id="regular-amount-tag">0</span></button></div></div></div><div id="modal-boosts" class="modal-backdrop hidden"><div class="modal-card"><div class="modal-header"><div class="modal-icon-badge">⚡</div><h2>Бусты</h2></div><div class="boost-cards-container"><div class="boost-offer-card"><div class="boost-offer-icon">🌋</div><div class="boost-offer-info"><h3>Фонтан x3</h3><p>x3 120с</p></div><button id="btn-claim-boost-fountain" class="btn-ad-action"><span>🎬</span></button></div><div class="boost-offer-card"><div class="boost-offer-icon">💰</div><div class="boost-offer-info"><h3>Грант</h3><p>Доход 10м</p></div><button id="btn-claim-boost-grant" class="btn-ad-action"><span>🎬</span></button></div></div><div class="modal-actions single"><button id="btn-close-boosts" class="btn-secondary">Закрыть</button></div></div></div><div id="modal-specialization" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="spec-modal-title"><div class="modal-card modal-specialization-card"><div class="modal-header"><div class="modal-badge-stage">Ур. 5</div><h2 id="spec-modal-title">Ветка</h2></div><div class="spec-cards-container"><div class="spec-choice-card spec-card-oil" id="spec-card-oil" tabindex="0" role="button" aria-label="Выбрать ветку Нефть"><div class="spec-card-badge">Тап</div><div class="spec-card-header"><div class="spec-icon-box spec-icon-oil">🛢️</div><div class="spec-title-group"><h3 class="spec-name">Нефть</h3></div></div><div class="spec-perks-list"><div class="spec-perk-item">Клик x2.5</div><div class="spec-perk-item">Биржа</div><div class="spec-perk-item">Выбросы</div><div class="spec-perk-item">Офлайн 2ч</div></div><button id="btn-select-oil" class="btn-spec-action btn-oil-action" type="button"><span class="btn-action-text">Нефть</span><span class="btn-action-sub">x2.5</span></button></div><div class="spec-choice-card spec-card-gas" id="spec-card-gas" tabindex="0" role="button" aria-label="Выбрать ветку Газ"><div class="spec-card-badge">Газ</div><div class="spec-card-header"><div class="spec-icon-box spec-icon-gas">🔥</div><div class="spec-title-group"><h3 class="spec-name">Газ</h3></div></div><div class="spec-perks-list"><div class="spec-perk-item">Дебит +45%</div><div class="spec-perk-item">Фьючерсы</div><div class="spec-perk-item">Офлайн 4ч</div><div class="spec-perk-item">Метан</div></div><button id="btn-select-gas" class="btn-spec-action btn-gas-action" type="button"><span class="btn-action-text">Газ</span><span class="btn-action-sub">+45%</span></button></div></div></div></div><div id="modal-exchange" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="exchange-modal-title"><div class="modal-card modal-exchange-card"><div class="modal-header"><div class="exchange-terminal-tag"><span class="live-indicator-dot"></span> БИРЖА (LIVE)
+</div><h2 id="exchange-modal-title">Биржа</h2></div><div class="exchange-quotes-grid"><div class="quote-card quote-oil" id="quote-card-oil"><div class="quote-header"><div class="quote-asset"><span class="quote-icon">🛢️</span><div><div class="quote-symbol">BRENT</div><div class="quote-asset-name">$</div></div></div><span id="exchange-oil-trend" class="trend-badge trend-up">▲ +0.0%</span></div><div class="quote-price-row"><span id="exchange-oil-price" class="quote-price gold-text">$75.00</span><span id="exchange-oil-mult" class="quote-mult">x1.00</span></div><div class="quote-bar-container"><div id="exchange-oil-bar" class="quote-bar-fill oil-bar" style="width: 50%;"></div></div></div><div class="quote-card quote-gas" id="quote-card-gas"><div class="quote-header"><div class="quote-asset"><span class="quote-icon">🔥</span><div><div class="quote-symbol">TTF</div><div class="quote-asset-name">€</div></div></div><span id="exchange-gas-trend" class="trend-badge trend-up">▲ +0.0%</span></div><div class="quote-price-row"><span id="exchange-gas-price" class="quote-price cyan-text">$35.00</span><span id="exchange-gas-mult" class="quote-mult">x1.00</span></div><div class="quote-bar-container"><div id="exchange-gas-bar" class="quote-bar-fill gas-bar" style="width: 50%;"></div></div></div></div><div class="active-event-card" id="exchange-event-card"><div class="event-card-header"><span id="exchange-event-badge" class="badge event-badge event-badge-geo">[ГЕОПОЛИТИКА]</span><span id="exchange-event-timer" class="event-timer">Ожидание...</span></div><h3 id="exchange-event-headline" class="event-headline">Рынки</h3><p id="exchange-event-desc" class="event-desc"></p><div class="event-effects-row"><span class="event-effect-label">Влияние:</span><span id="exchange-event-effect" class="event-effect-pill effect-positive">Стабильно</span></div></div><div class="broker-insider-card" id="broker-insider-card"><div class="broker-card-content"><div class="broker-avatar">🕵️‍♂️</div><div class="broker-info"><div class="broker-tag">ИНСАЙД</div><h3 class="broker-title">Сделка</h3></div></div><div id="broker-active-status" class="broker-status-bar hidden"><div class="broker-status-pulse"></div><span class="broker-status-text">x2.5</span><span id="broker-timer-display" class="broker-timer">90с</span></div><button id="btn-broker-insider" class="btn-broker-action" type="button"><span class="btn-broker-icon">📈</span><div class="btn-broker-text-group"><span id="btn-broker-title" class="btn-broker-title">ПОЛУЧИТЬ ИНСАЙД (x2.5 ПАМП)</span><span id="btn-broker-sub" class="btn-broker-sub">Инсайд 🎬</span></div></button></div><div class="modal-actions single"><button id="btn-close-exchange" class="btn-secondary" type="button">Назад</button></div></div></div><div id="modal-accident" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="accident-title"><div class="modal-card modal-accident-card"><div class="modal-header"><div id="accident-badge" class="modal-badge-stage badge-emergency">🚨</div><h2 id="accident-title">Грифон!</h2><p id="accident-desc" class="modal-subtitle">Аварийный выброс на скважине!</p></div><div class="accident-countdown-box"><div class="accident-timer-header"><span class="timer-label">⏱️ До аварии:</span><span id="accident-timer" class="accident-timer-val">6.0с</span></div><div class="accident-timer-track"><div id="accident-timer-bar" class="accident-timer-bar" style="width: 100%;"></div></div></div><div class="qte-challenge-box"><div class="qte-status-row"><span class="qte-task-text">Ликвидация:</span><span id="qte-progress-text" class="qte-pct">0%</span></div><div class="qte-bar-track"><div id="qte-progress-bar" class="qte-bar-fill" style="width: 0%;"></div></div><button id="btn-qte-action" class="btn-qte-wrench" type="button"><span class="qte-btn-icon">🔧</span><div class="qte-btn-text-group"><span class="qte-btn-title">Крутить задвижку</span><span class="qte-btn-sub">Быстро тапай для закрытия!</span></div></button></div><div class="mchs-call-box"><button id="btn-call-mchs" class="btn-mchs-rescue" type="button"><span class="mchs-btn-icon">🚒</span><div class="mchs-btn-text-group"><span class="mchs-btn-title">Вызов МЧС</span><span class="mchs-btn-sub">Ликвидация аварии 🎬</span></div><span id="mchs-payout-tag" class="mchs-payout-pill">+0 ₽</span></button></div></div></div><div id="modal-ipo" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="ipo-modal-title"><div class="modal-card modal-ipo-card"><div class="modal-header"><div class="modal-badge-stage badge-ipo">IPO</div><h2 id="ipo-modal-title">IPO</h2></div><div class="ipo-input-section"><div class="input-header-row"><label for="input-company-name" class="input-label">Имя:</label><span id="ipo-char-count" class="char-count">0 / 24</span></div><div class="input-wrapper"><span class="input-prefix">ПАО «</span><input id="input-company-name" type="text" maxlength="24" placeholder="СеверНефтьГаз" autocomplete="off" spellcheck="false" class="input-company-field" aria-describedby="ipo-name-error"><span class="input-suffix">»</span></div><div id="ipo-name-error" class="input-feedback-msg hidden" role="alert"></div></div><div id="ipo-certificate" class="ipo-certificate"><div class="cert-company-display" id="cert-company-preview">ПАО «СеверНефтьГаз»</div><div class="cert-total-row"><span>Золотые акции:</span><span id="cert-total-shares" class="gold-text">+1 акция (+2% доход)</span></div><span id="cert-shares-awarded" class="hidden"></span><span id="cert-dividend-bonus" class="hidden"></span></div><div id="ipo-explanation-plate" class="ipo-explanation-plate">ℹ️ IPO</div><div class="modal-actions"><button id="btn-confirm-ipo" class="btn-primary-ipo" type="button" disabled><span class="ipo-btn-icon">🏛️</span><span id="btn-ipo-action-title">На биржу</span><span id="btn-ipo-action-sub" class="hidden"></span></button><button id="btn-close-ipo" class="btn-secondary" type="button">Отложить</button></div></div></div><div id="modal-streak" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="streak-title"><div class="modal-card modal-streak-card"><div class="modal-header"><div class="modal-badge-stage badge-streak">Бонус</div><h2 id="streak-title">7 Дней</h2></div><div class="streak-grid" id="streak-days-grid"><div class="streak-day-card">Д1</div><div class="streak-day-card">Д2</div><div class="streak-day-card">Д3</div><div class="streak-day-card">Д4</div><div class="streak-day-card">Д5</div><div class="streak-day-card">Д6</div><div class="streak-day-card day-7">Д7</div></div><div class="modal-actions"><button id="btn-double-streak" class="btn-primary-ipo" type="button"><span class="ipo-btn-text-group"><span class="ipo-btn-title">🎬 x2</span><span class="ipo-btn-sub">+Акции</span></span></button><button id="btn-claim-streak" class="btn-secondary" type="button">Забрать</button></div></div></div><div id="modal-supply-crate" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="crate-title"><div class="modal-card modal-crate-card"><div class="modal-header"><div class="modal-badge-stage badge-crate">Сброс</div><h2 id="crate-title">Сброс</h2></div><div class="modal-actions"><button id="btn-claim-crate-ad" class="btn-primary-ipo" type="button"><span class="ipo-btn-text-group"><span class="ipo-btn-title">🎬 x2</span><span class="ipo-btn-sub">Видео</span></span></button><button id="btn-claim-crate-free" class="btn-secondary" type="button">Забрать</button></div></div></div><div id="modal-marketplace" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="marketplace-title"><div class="modal-card modal-marketplace-card"><div class="modal-header"><div class="modal-badge-stage badge-market">🛒 ТЕХНОЛОГИИ</div><h2 id="marketplace-title">МАРКЕТПЛЕЙС</h2><p class="modal-subtitle">Техника</p></div><div class="marketplace-tabs"><button class="market-tab-btn active" data-cat="1">₽ Добыча</button><button class="market-tab-btn" data-cat="2">$ Экспорт</button><button class="market-tab-btn" data-cat="3">⚡ Факел</button><button class="market-tab-btn" data-cat="4">IPO</button></div><div id="marketplace-cards-list" class="marketplace-cards-container"></div><div class="modal-actions single"><button id="btn-close-marketplace" class="btn-secondary" type="button">Закрыть</button></div></div></div><div id="modal-company-stock" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="stock-terminal-title"><div class="modal-card modal-stock-card"><div class="modal-header"><div class="modal-badge-stage badge-market">📈 БИРЖА MOEX</div><h2 id="stock-terminal-title">АКЦИИ ПАО</h2><p class="modal-subtitle" id="stock-terminal-subtitle">Котировки и капитализация</p></div><div class="stock-stats-grid"><div class="stock-stat-box"><span class="stock-stat-label">ТИКЕР</span><span id="stock-ticker" class="stock-stat-value gold-text">MOEX:SEVR</span></div><div class="stock-stat-box"><span class="stock-stat-label">ЦЕНА АКЦИИ</span><span id="stock-price" class="stock-stat-value green-text">125.40 ₽</span></div><div class="stock-stat-box"><span class="stock-stat-label">КАПИТАЛИЗАЦИЯ</span><span id="stock-marketcap" class="stock-stat-value cyan-text">12.5 млн ₽</span></div><div class="stock-stat-box"><span class="stock-stat-label">ЗОЛОТЫЕ АКЦИИ</span><span id="stock-golden-shares" class="stock-stat-value gold-text">1 шт (+2% дебит)</span></div></div><div class="stock-chart-container"><div class="stock-chart-header"><span>Котировки ПАО (Таймфрейм M5)</span><span id="stock-chart-change" class="green-text">+4.2% ▲</span></div><canvas id="stock-chart-canvas" width="320" height="90"></canvas></div><div class="stock-prestige-section"><div class="prestige-info"><span class="prestige-tier-label" id="stock-prestige-tier">Корпоративный Тир: 1</span><span class="prestige-desc" id="stock-prestige-desc">Новый раунд инвестиций (SPO / Допэмиссия) привлекает крупный венчурный капитал, дает +1 золотую акцию (+2% ко всем скважинам навсегда) и повышает статус корпорации.</span></div><button id="btn-stock-spo" class="btn-primary-ipo" type="button"><span class="ipo-btn-icon">📈</span><span id="btn-spo-title">ПРОВЕСТИ SPO (ДОПЭМИССИЯ)</span></button></div><div class="modal-actions single"><button id="btn-close-company-stock" class="btn-secondary" type="button">Закрыть</button></div></div></div><div id="modal-spec-info" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="spec-info-title"><div class="modal-card modal-spec-card"><div class="modal-header"><div class="modal-badge-stage badge-spec" id="spec-info-badge">🔥 СПЕЦИАЛИЗАЦИЯ</div><h2 id="spec-info-title">ГАЗОВАЯ ОТРАСЛЬ</h2><p class="modal-subtitle" id="spec-info-sub">Особенности и технологические бонусы</p></div><div class="spec-info-content" id="spec-info-content"></div><div class="modal-actions single"><button id="btn-close-spec-info" class="btn-secondary" type="button">Понятно</button></div></div></div><div id="advisor-bubble" class="advisor-bubble hidden"><div class="advisor-avatar" id="advisor-avatar">👷‍♂️</div><div class="advisor-content"><div class="advisor-header"><span class="advisor-title" id="advisor-title">Прораб</span><button id="btn-dismiss-advisor" class="btn-dismiss-advisor" aria-label="Закрыть">✕</button></div><p class="advisor-text" id="advisor-text"></p></div></div><div id="rewarded-debit-pill" class="rewarded-debit-pill hidden"><div class="rewarded-pill-icon">⚡</div><div class="rewarded-pill-info"><span class="rewarded-pill-title">Удвоить дебит x2?</span><span class="rewarded-pill-desc">На 3 минуты за рекламу</span></div><button id="btn-watch-debit-ad" class="btn-watch-debit-ad" type="button">Смотреть 🎬</button><button id="btn-dismiss-debit-ad" class="btn-dismiss-debit-ad" type="button" aria-label="Закрыть">✕</button></div><div id="modal-crypto-activation" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="crypto-activation-title"><div class="modal-card modal-crypto-card"><div class="modal-header"><div class="modal-badge-stage" style="background:rgba(168,85,247,0.2);border:1px solid #a855f7;color:#c084fc;">⚡ PETROCOIN</div><h2 id="crypto-activation-title">ГАЗОТУРБИННЫЙ МАЙНИНГ</h2><p class="modal-subtitle">Активация утилизации попутного газа и крипто-генерации</p></div><div class="crypto-activation-body"><div class="crypto-status-box"><span class="crypto-status-icon">🔒</span><div class="crypto-status-desc"><strong>Статус: ОБЕСТОЧЕНО</strong><p>Газовые турбины остановлены. Для запуска майнинг-фермы требуется подключить силовые трансформаторы.</p></div></div><div class="crypto-options-container"><div class="crypto-option-card"><div class="crypto-option-title">Вариант 1: Инвестиции</div><p class="crypto-option-desc">Оплатить установку промышленных генераторов</p><button id="btn-unlock-crypto-money" class="btn-crypto-act" type="button"><span>⚡ Запустить за 5 000 000 ₽</span></button></div><div class="crypto-option-card"><div class="crypto-option-title">Вариант 2: Спонсорский контракт</div><p class="crypto-option-desc">Просмотреть 10 спонсорских роликов для поставки оборудования</p><div class="crypto-ad-progress-box"><span id="crypto-ad-counter">Прогресс: 0 / 10 🎬</span><div class="crypto-ad-track"><div id="crypto-ad-fill" class="crypto-ad-fill" style="width: 0%;"></div></div></div><button id="btn-unlock-crypto-ad" class="btn-crypto-act btn-crypto-ad" type="button"><span>🎬 Смотреть рекламу (+1)</span></button></div></div></div><div class="modal-actions single"><button id="btn-close-crypto-activation" class="btn-secondary" type="button">Закрыть</button></div></div></div><div id="loading-screen" class="loading-screen"><div class="loader-oil-drop"></div><div class="loader-title">НЕФТЯНОЙ ОЛИГАРХ</div><div class="loader-sub"></div></div><!-- WORLD MAP MODAL (Screenshot 2) --><div id="modal-world-map" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="world-map-title"><div class="modal-card modal-world-map-card"><div class="world-map-top-bar"><div class="map-top-left"><button id="btn-close-world-map" class="btn-icon" type="button" title="Закрыть">✕</button><span class="world-map-title-tag">КАРТА МЕСТОРОЖДЕНИЙ</span></div><div class="map-top-right"><div class="gp-stat-pill balance-pill"><span class="gp-pill-icon">🪙</span><span id="world-map-coins" class="gp-pill-val gold-text">0</span><span class="pill-plus">+</span></div><div class="gp-stat-pill star-pill"><span class="gp-pill-icon">⭐</span><span id="world-map-stars" class="gp-pill-val purple-text">0</span><span class="pill-plus">+</span></div></div></div><div class="world-map-viewport"><div class="world-continents-bg">
+        <!-- Stylized Russian Federation Silhouette & Yamal Zero Point -->
+        <svg class="world-map-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <defs>
+            <radialGradient id="yamalGlow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.8"/>
+              <stop offset="100%" stop-color="#0284c7" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <!-- Arctic Ocean Grid Lines -->
+          <line x1="0" y1="20" x2="100" y2="20" stroke="#0369a1" stroke-width="0.3" stroke-dasharray="1,2" opacity="0.4"/>
+          <line x1="0" y1="40" x2="100" y2="40" stroke="#0369a1" stroke-width="0.3" stroke-dasharray="1,2" opacity="0.4"/>
+          <line x1="0" y1="60" x2="100" y2="60" stroke="#0369a1" stroke-width="0.3" stroke-dasharray="1,2" opacity="0.4"/>
+          <line x1="30" y1="0" x2="30" y2="100" stroke="#0369a1" stroke-width="0.3" stroke-dasharray="1,2" opacity="0.4"/>
+          <line x1="60" y1="0" x2="60" y2="100" stroke="#0369a1" stroke-width="0.3" stroke-dasharray="1,2" opacity="0.4"/>
+          
+          <!-- Russian Federation Landmass Outline (Baltic to Pacific) -->
+          <path class="continent-russia" d="M 12 40 Q 14 30 20 28 L 24 22 Q 28 20 30 26 L 36 28 Q 40 22 42 16 L 46 16 Q 48 24 50 28 L 56 20 Q 62 18 64 26 L 72 24 Q 78 22 84 26 L 94 28 Q 98 34 94 44 L 88 54 Q 84 62 86 70 L 82 72 L 78 60 Q 72 58 66 62 L 58 64 Q 52 66 44 64 L 34 66 Q 26 68 20 62 L 16 54 L 14 46 Z" fill="#090d16" stroke="#1e293b" stroke-width="0.8"/>
+          
+          <!-- Sakhalin Island -->
+          <path class="island-sakhalin" d="M 87 50 Q 89 48 88 58 Q 87 64 86 60 Z" fill="#090d16" stroke="#1e293b" stroke-width="0.6"/>
+          <!-- Kamchatka Peninsula -->
+          <path class="peninsula-kamchatka" d="M 90 32 Q 95 38 92 48 L 88 44 Z" fill="#090d16" stroke="#1e293b" stroke-width="0.6"/>
+          <!-- Novaya Zemlya Archipelago -->
+          <path class="island-novaya-zemlya" d="M 37 14 Q 40 8 38 18 Z" fill="#090d16" stroke="#1e293b" stroke-width="0.6"/>
+          
+          <!-- Yamal Peninsula - ZERO POINT (Highlighted in Bright White with Arctic Blue Aura) -->
+          <circle cx="44" cy="24" r="8" fill="url(#yamalGlow)"/>
+          <path class="unlocked-region-yamal" d="M 42 26 L 43 17 Q 44.5 14 46 17 L 46.5 26 Z" fill="#ffffff" stroke="#38bdf8" stroke-width="1.2"/>
+          <circle cx="44" cy="24" r="1.8" fill="#ef4444" stroke="#ffffff" stroke-width="0.8"/>
+        </svg>
+      </div><div id="world-map-pins" class="world-map-pins-layer"></div><button id="btn-world-home" class="btn-world-home" type="button" title="Вернуться на промысел"><span class="home-icon">🏠</span></button></div><div id="world-territory-card" class="world-territory-card"><div class="territory-card-header"><span id="world-territory-badge" class="territory-badge">МЕСТОРОЖДЕНИЕ</span><h3 id="world-territory-name">Западная Сибирь • Ямал</h3></div><div class="territory-card-body"><div class="territory-stat-row"><span>Эффект:</span><strong id="world-territory-bonus" class="green-text">+0% дебит</strong></div><div class="territory-stat-row"><span>Условие:</span><span id="world-territory-desc">Действующая база</span></div></div><button id="btn-unlock-territory" class="btn-territory-action" type="button"><span>ОСВОИТЬ МЕСТОРОЖДЕНИЕ</span></button></div></div></div><!-- STRUCTURE UPGRADE SHEET (For all diorama buildings: KTPN, Gatehouse, Fence, MTR Yard, Compressor, Gas Treatment, Dormitory) -->
+  <div id="structure-upgrade-sheet" class="well-upgrade-sheet hidden" role="dialog" aria-labelledby="sheet-structure-name">
+    <div class="sheet-drag-handle"></div>
+    <div class="sheet-header">
+      <div class="sheet-title-group">
+        <span id="sheet-structure-badge" class="sheet-well-badge" style="background:#0284c7;color:#fff;">ИНФРАСТРУКТУРА</span>
+        <h3 id="sheet-structure-name" class="sheet-well-name">Здание промысла</h3>
+      </div>
+      <button id="btn-close-structure-sheet" class="btn-sheet-close" type="button" aria-label="Закрыть">✕</button>
+    </div>
+    <div class="sheet-stats-row">
+      <div class="sheet-stat-box">
+        <span class="sheet-stat-label">Текущий уровень</span>
+        <span id="sheet-structure-current-level" class="sheet-stat-val">Ур. 1</span>
+      </div>
+      <div class="sheet-arrow">➔</div>
+      <div class="sheet-stat-box">
+        <span class="sheet-stat-label">Бонус к дебиту</span>
+        <span id="sheet-structure-bonus-val" class="sheet-stat-val green-text">+10%</span>
+      </div>
+    </div>
+    <div class="sheet-actions">
+      <button id="btn-structure-upgrade" class="btn-sheet-upgrade" type="button">
+        <span id="sheet-structure-btn-text">УЛУЧШИТЬ ОБЪЕКТ</span>
+        <span id="sheet-structure-cost" class="sheet-btn-cost">12 000 ₽</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- BLOCK BLAST MINI-GAME MODAL --><div id="modal-block-blast" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="blast-modal-title"><div class="modal-card modal-block-blast-card"><div class="modal-header"><div class="modal-badge-stage" style="background:#0284c7;color:#fff;">СБОРКА КОЛЛЕКТОРА (8x8)</div><h2 id="blast-modal-title">ОЧИСТКА ГИДРАТОВ</h2><p class="modal-subtitle">Заполняйте линии трубами для продувки шлейфа и супер-буста дебита!</p></div><div class="blast-stats-bar">
+          <div class="blast-stat-pill timer-pill">⏱️ <span id="block-blast-timer" class="gold-text">60</span>с</div><div class="blast-stat-item"><span class="blast-label">ОЧКИ</span><span id="block-blast-score" class="gold-text font-bold">0</span></div><div class="blast-stat-item"><span class="blast-label">КОМБО</span><span id="block-blast-combo" class="cyan-text font-bold">x0</span></div><div class="blast-stat-item"><span class="blast-label">ПРОДУТО</span><span id="block-blast-lines" class="green-text font-bold">0</span></div></div><div class="blast-board-wrapper"><div id="block-blast-grid" class="blast-grid-8x8"></div></div><div class="blast-dock-wrapper"><div class="dock-instruction">Выберите трубу и нажмите на сетку коллектора:</div><div id="block-blast-dock" class="blast-dock-row"></div></div><div id="block-blast-summary" class="blast-summary-overlay hidden"><div class="summary-box"><h3>💨 ПРОДУВКА ЗАВЕРШЕНА!</h3><p>Шлейф очищен, гидратные пробки выбиты!</p><div class="summary-stats"><div>Очки: <strong id="summary-score-val" class="gold-text">0</strong></div><div>Продуто линий: <strong id="summary-lines-val" class="cyan-text">0</strong></div><div>Премия: <strong id="summary-reward-val" class="green-text">+1 500 ₽</strong></div><div>Супер-буст: <strong class="gold-text">+150% дебита на 3 мин</strong></div></div><button id="btn-finish-block-blast" class="btn-primary-ipo" type="button">ПРИНЯТЬ РАБОТУ</button></div></div><div class="modal-actions single"><button id="btn-close-block-blast" class="btn-secondary" type="button">Закрыть</button></div></div></div><!-- SAVELICH FOREMAN UPGRADE MODAL --><div id="modal-savelich-upgrade" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="savelich-modal-title"><div class="modal-card modal-savelich-card"><div class="modal-header"><div class="modal-icon-badge">👷‍♂️</div><h2 id="savelich-modal-title">БРИГАДИР САВЕЛЬИЧ</h2><p class="modal-subtitle">Опытный начальник вахты ускоряет работу всех звеньев промысла</p></div><div class="savelich-stats-grid"><div class="savelich-stat-box"><span class="stat-label">Текущий разряд</span><span id="savelich-level-val" class="stat-value gold-text">Разряд 1</span></div><div class="savelich-stat-box"><span class="stat-label">Бонус бригады</span><span id="savelich-cur-bonus" class="stat-value green-text">+0%</span></div><div class="savelich-stat-box"><span class="stat-label">После повышения</span><span id="savelich-next-bonus" class="stat-value cyan-text">+15%</span></div></div><div class="savelich-quotes-box"><p class="savelich-quote">«Труба любит чистоту и давление! Следи за манометрами и вовремя продувай коллекторы от гидратов!»</p></div><div class="modal-actions"><button id="btn-upgrade-savelich" class="btn-primary-ipo" type="button"><span class="ipo-btn-icon">⭐</span><div class="btn-text-group"><span class="ipo-btn-title">ПОВЫСИТЬ РАЗРЯД</span><span id="savelich-upgrade-cost" class="ipo-btn-sub">1 500 ₽</span></div></button><button id="btn-close-savelich" class="btn-secondary" type="button">Закрыть</button></div></div></div><!-- SETTINGS MODAL -->
+  <div id="modal-settings" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
+    <div class="modal-card modal-settings-card">
+      <div class="modal-header">
+        <div class="modal-badge-stage"><span class="badge-icon">⚙️</span><span>ОПЦИИ</span></div>
+        <h2 id="settings-modal-title">НАСТРОЙКИ</h2>
+      </div>
+      <div class="settings-options-list">
+        <div class="settings-row">
+          <span class="settings-label">Звуковые эффекты:</span>
+          <button id="btn-setting-sound" class="btn-setting-toggle" type="button">
+            <span class="toggle-text">ВКЛ</span>
+            <span class="toggle-icon">🔊</span>
+          </button>
+        </div>
+        <div class="settings-row">
+          <span class="settings-label">Проекция камеры:</span>
+          <button id="btn-setting-cam" class="btn-setting-toggle" type="button">
+            <span class="toggle-text">ИЗОМЕТРИЯ</span>
+            <span class="toggle-icon">📐</span>
+          </button>
+        </div>
+        <div class="settings-row">
+          <span class="settings-label">Время суток:</span>
+          <button id="btn-setting-night" class="btn-setting-toggle" type="button">
+            <span class="toggle-text">ДЕНЬ</span>
+            <span class="toggle-icon">☀️</span>
+          </button>
+        </div>
+        <div class="settings-row reset-row">
+          <button id="btn-reset-game-fresh" class="btn-danger" type="button">
+            <span class="btn-danger-icon">🔄</span>
+            <span class="btn-danger-text">Сбросить прогресс игры (Начать с 0 ₽)</span>
+          </button>
+        </div>
+      </div>
+      <div class="modal-actions single">
+        <button id="btn-close-settings" class="btn-secondary" type="button">Закрыть</button>
+      </div>
+    </div>
+  </div><!-- ANIMATED TUTORIAL HAND POINTER (Screenshot 4) --><div id="tutorial-hand-pointer" class="tutorial-hand-pointer hidden" aria-hidden="true"><span class="hand-icon">👆</span></div>
+  <!-- DISPATCH MANAGEMENT MODAL -->
+  <div id="modal-dispatch-panel" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="dispatch-modal-title">
+    <div class="modal-card modal-dispatch-card">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <div class="modal-badge-stage" style="background:rgba(56,189,248,0.15);color:#38bdf8;border-color:#0284c7;">🎛️ ДИСПЕТЧЕРСКАЯ</div>
+          <h2 id="dispatch-modal-title" style="margin:2px 0 0;font-size:16px;font-weight:800;color:#f8fafc;letter-spacing:-0.01em;">ПУЛЬТ УПРАВЛЕНИЯ ПРОМЫСЛОМ</h2>
+        </div>
+        <button id="btn-close-dispatch-modal" class="btn-modal-close" type="button" aria-label="Закрыть">✕</button>
+      </div>
+      <div class="dispatcher-tabs">
+        <button class="btn-dispatch-tab active" data-tab="logistics" type="button">🚚 Транзит &amp; Подача</button>
+        <button class="btn-dispatch-tab" data-tab="crew" type="button">👷 Персонал &amp; Вахта</button>
+        <button class="btn-dispatch-tab" data-tab="summary" type="button">📊 Сводка &amp; Метрики</button>
+        <button class="btn-dispatch-tab" data-tab="contracts" type="button">📋 Контракты</button>
+      </div>
+      <div id="dispatcher-modal-content" class="dispatcher-content"></div>
+    </div>
+  </div>
+  <!-- INDUSTRIAL SECTOR & RECIPES MODAL (M1 TOWNSHIP) -->
+  <div id="modal-industrial-sector" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="industrial-modal-title">
+    <div class="modal-card modal-industrial-card">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <div class="modal-badge-stage badge-gazprom" id="industrial-sector-badge">🏭 ПРОМЫШЛЕННЫЙ СЕКТОР</div>
+          <h2 id="industrial-modal-title">НПЗ «Северный Факел»</h2>
+          <p class="modal-subtitle" id="industrial-modal-desc">Переработка сырья и настройка производственных линий</p>
+        </div>
+        <button id="btn-close-industrial-modal" class="btn-modal-close" type="button" aria-label="Закрыть">✕</button>
+      </div>
+      <div class="industrial-tabs">
+        <button class="btn-ind-tab active" data-sector="refinery" type="button">⛽ НПЗ</button>
+        <button class="btn-ind-tab" data-sector="gas_plant" type="button">❄️ ГПЗ</button>
+        <button class="btn-ind-tab" data-sector="petrochem" type="button">🧪 НГХК</button>
+        <button class="btn-ind-tab" data-sector="storage_park" type="button">🛢️ РВС</button>
+      </div>
+      <div id="industrial-sector-body" class="industrial-sector-body"></div>
+    </div>
+  </div>
+  <!-- REGIONAL CONTRACTS BOARD MODAL (M2 TOWNSHIP) -->
+  <div id="modal-contracts-board" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="contracts-board-title">
+    <div class="modal-card modal-contracts-card">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <div class="modal-badge-stage badge-gazprom">📋 ЛОГИСТИКА СМП • ДОСКА ЗАКАЗОВ</div>
+          <h2 id="contracts-board-title">РЕГИОНАЛЬНЫЕ КОНТРАКТЫ</h2>
+          <p class="modal-subtitle">Поставка готовой продукции партнерам и снабжение арктических проектов</p>
+        </div>
+        <button id="btn-close-contracts-modal" class="btn-modal-close" type="button" aria-label="Закрыть">✕</button>
+      </div>
+      <div class="contracts-stats-bar">
+        <div class="contract-stat-pill mtr-pill">
+          <span class="pill-icon">🏗️</span>
+          <span class="pill-label">Стройматериалы МТР:</span>
+          <span id="contracts-mtr-val" class="pill-val gold-text">0 шт</span>
+        </div>
+        <div class="contract-stat-pill orders-pill">
+          <span class="pill-icon">📦</span>
+          <span class="pill-label">Выполнено заказов:</span>
+          <span id="contracts-fulfilled-val" class="pill-val cyan-text">0</span>
+        </div>
+      </div>
+      <div id="contracts-cards-grid" class="contracts-cards-grid"></div>
+    </div>
+  </div>
+  <!-- WORKER SETTLEMENT «СЕВЕРНАЯ ЗВЕЗДА» MODAL (M3 TOWNSHIP) -->
+  <div id="modal-settlement" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="settlement-modal-title">
+    <div class="modal-card modal-settlement-card">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <div class="modal-badge-stage badge-gazprom">🏠 ЖИЛОЙ СЕКТОР & КАДРЫ</div>
+          <h2 id="settlement-modal-title">ПОСЁЛОК «СЕВЕРНАЯ ЗВЕЗДА»</h2>
+          <p class="modal-subtitle">Жизнеобеспечение в -45°C и вахтовые смены специалистов</p>
+        </div>
+        <button id="btn-close-settlement-modal" class="btn-modal-close" type="button" aria-label="Закрыть">✕</button>
+      </div>
+
+      <!-- Vital Infrastructure Summary (Warmth, Housing, Canteen) -->
+      <div class="settlement-vitals-grid">
+        <!-- Card 1: Warmth & Boiler -->
+        <div class="settlement-vital-card" id="vital-boiler-card">
+          <div class="vital-card-top">
+            <div class="vital-card-header">
+              <span class="vital-icon">🌡️</span>
+              <div class="vital-info">
+                <span class="vital-label">Теплоснабжение</span>
+                <span id="settlement-warmth-val" class="vital-val cyan-text">100% (+22°C)</span>
+              </div>
+            </div>
+            <button id="btn-upgrade-boiler" class="btn-action-small" type="button">Улучшить котельную</button>
+          </div>
+          <div class="vital-card-bottom">
+            <div class="vital-progress-track">
+              <div id="settlement-warmth-bar" class="vital-progress-fill cyan-fill" style="width: 100%;"></div>
+            </div>
+            <span id="settlement-boiler-status" class="vital-subtext">Отопление: в норме</span>
+          </div>
+        </div>
+
+        <!-- Card 2: Housing Modules -->
+        <div class="settlement-vital-card" id="vital-housing-card">
+          <div class="vital-card-top">
+            <div class="vital-card-header">
+              <span class="vital-icon">🏢</span>
+              <div class="vital-info">
+                <span class="vital-label">Жилищный фонд</span>
+                <span id="settlement-pop-val" class="vital-val gold-text">24 / 40 чел</span>
+              </div>
+            </div>
+            <button id="btn-upgrade-housing" class="btn-action-small" type="button">Расширить модуль</button>
+          </div>
+          <div class="vital-card-bottom">
+            <div class="vital-progress-track">
+              <div id="settlement-pop-bar" class="vital-progress-fill gold-fill" style="width: 60%;"></div>
+            </div>
+            <span id="settlement-free-workers-val" class="vital-subtext">Свободно: 0 чел</span>
+          </div>
+        </div>
+
+        <!-- Card 3: Canteen & Morale -->
+        <div class="settlement-vital-card" id="vital-canteen-card">
+          <div class="vital-card-top">
+            <div class="vital-card-header">
+              <span class="vital-icon">☕</span>
+              <div class="vital-info">
+                <span class="vital-label">Столовая и медпункт</span>
+                <span id="settlement-morale-val" class="vital-val green-text">Мораль: +20%</span>
+              </div>
+            </div>
+            <button id="btn-distribute-rations" class="btn-action-small" type="button">Раздать паёк</button>
+          </div>
+          <div class="vital-card-bottom">
+            <div class="vital-progress-track">
+              <div id="settlement-morale-bar" class="vital-progress-fill green-fill" style="width: 75%;"></div>
+            </div>
+            <span id="settlement-ration-timer" class="vital-subtext">Паёк: готов</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Shift Workforce Allocation -->
+      <div class="settlement-shifts-section">
+        <div class="shifts-section-header">
+          <div class="section-title-wrap">
+            <span class="section-icon">👷</span>
+            <h3 class="shifts-section-title">Распределение смен по объектам</h3>
+          </div>
+          <button id="btn-auto-allocate-shifts" class="btn-secondary-pill" type="button">⚡ Автобаланс смен</button>
+        </div>
+        <div class="shifts-cards-grid" id="settlement-shifts-grid"></div>
+      </div>
+    </div>
+  </div>
+  <!-- MEGAPROJECT «ЯМАЛ-СПГ» & POLAR SEASONS MODAL (M5 TOWNSHIP) -->
+  <div id="modal-megaproject" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="megaproject-modal-title">
+    <div class="modal-card modal-megaproject-card">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <div class="modal-badge-stage badge-gazprom">🏆 СТРОИТЕЛЬСТВО ВЕКА • ГОРИЗОНТ</div>
+          <h2 id="megaproject-modal-title">МЕГАПРОЕКТ «ЯМАЛ-СПГ»</h2>
+          <p class="modal-subtitle">Флагманский комплекс сжижения природного газа и круглогодичный экспорт СМП</p>
+        </div>
+        <button id="btn-close-megaproject-modal" class="btn-modal-close" type="button" aria-label="Закрыть">✕</button>
+      </div>
+
+      <!-- Polar Seasons Live Banner -->
+      <div id="megaproject-season-banner" class="megaproject-season-banner">
+        <div class="season-banner-left">
+          <span id="megaproject-season-icon" class="season-banner-icon">☀️</span>
+          <div class="season-banner-info">
+            <div class="season-banner-title-row">
+              <span class="season-banner-label">Текущий полярный сезон:</span>
+              <strong id="megaproject-season-name" class="season-name-text">Полярный день</strong>
+            </div>
+            <span id="megaproject-season-buff" class="season-buff-tag green-text">+25% скорость бурения и производства</span>
+          </div>
+        </div>
+        <div class="season-banner-right">
+          <span class="season-timer-label">Смена сезона через:</span>
+          <span id="megaproject-season-timer" class="season-timer-val gold-text">15:00</span>
+        </div>
+      </div>
+
+      <!-- Megaproject Construction Overall Progress -->
+      <div class="megaproject-overall-progress">
+        <div class="overall-progress-header">
+          <span class="overall-progress-label">Прогресс возведения завода СПГ:</span>
+          <span id="megaproject-stage-indicator" class="overall-progress-status cyan-text">ЭТАП 1 ИЗ 4</span>
+        </div>
+        <div class="overall-progress-track">
+          <div id="megaproject-progress-bar" class="overall-progress-fill cyan-fill" style="width: 0%;"></div>
+        </div>
+      </div>
+
+      <!-- 4 Monumental Construction Stages List -->
+      <div id="megaproject-stages-list" class="megaproject-stages-list"></div>
+
+      <!-- Endless Corporate Prestige Section -->
+      <div id="megaproject-prestige-section" class="megaproject-prestige-section hidden">
+        <div class="prestige-card">
+          <div class="prestige-card-header">
+            <span class="prestige-icon">👑</span>
+            <div class="prestige-header-text">
+              <span class="prestige-badge-title">БЕСКОНЕЧНЫЙ ЭНДГЕЙМ • ТАЙКУН</span>
+              <h3 class="prestige-title">КОРПОРАТИВНЫЙ ПРЕСТИЖ ХОЛДИНГА</h3>
+              <p class="prestige-desc">После запуска «Ямал-СПГ» развивайте транснациональную экспансию, осваивая шельф Карского моря и получая Золотые Акции за каждый новый инвестиционный раунд.</p>
+            </div>
+          </div>
+          <div class="prestige-stats-row">
+            <div class="prestige-stat-item">
+              <span class="prestige-stat-lbl">Текущий ранг:</span>
+              <strong id="prestige-level-val" class="prestige-stat-num gold-text">УРОВЕНЬ 1</strong>
+            </div>
+            <div class="prestige-stat-item">
+              <span class="prestige-stat-lbl">Стоимость раунда:</span>
+              <strong id="prestige-cost-val" class="prestige-stat-num cyan-text">50 000 000 ₽</strong>
+            </div>
+          </div>
+          <button id="btn-advance-prestige" class="btn-primary-ipo btn-prestige-action" type="button">
+            <span class="ipo-btn-icon">⭐</span>
+            <div class="btn-text-group">
+              <span class="ipo-btn-title">ПОВЫСИТЬ ПРЕСТИЖ (+1 ЗОЛОТАЯ АКЦИЯ)</span>
+              <span class="ipo-btn-sub">+2% ко всем доходам корпорации навсегда</span>
+            </div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- MARINE EXPORT TERMINAL & ARCTIC TANKER MODAL (R2) -->
+  <div id="modal-marine-export" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="marine-modal-title">
+    <div class="modal-card modal-marine-export-card">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <div class="modal-badge-stage badge-gazprom">🚢 МОРСКОЙ ТЕРМИНАЛ • СМП</div>
+          <h2 id="marine-modal-title">ТАНКЕР ARC7 «ШТУРМАН АЛЬБАНОВ»</h2>
+          <p class="modal-subtitle">Круглогодичный экспортный налив углеводородов по Северному морскому пути</p>
+        </div>
+        <button id="btn-close-marine-modal" class="btn-modal-close" type="button" aria-label="Закрыть">✕</button>
+      </div>
+
+      <!-- Live Voyage Status & Progress Banner -->
+      <div class="tanker-status-banner">
+        <div class="tanker-status-header">
+          <div class="status-left">
+            <span class="status-prefix">СТАТУС ТАНКЕРА:</span>
+            <strong id="tanker-status-text" class="tanker-status-text">⚓ В ПОРТУ (ОЖИДАНИЕ НАЛИВА)</strong>
+          </div>
+          <span id="tanker-live-timer" class="tanker-live-timer gold-text">Готов к погрузке</span>
+        </div>
+        <div class="tanker-progress-track">
+          <div id="tanker-progress-fill" class="tanker-progress-fill cyan-fill" style="width: 0%;"></div>
+        </div>
+      </div>
+
+      <!-- Dual Upgrades: Capacity & Speed Grid -->
+      <div class="tanker-upgrades-grid">
+        <!-- Upgrade 1: Hold Capacity -->
+        <div class="tanker-upgrade-card" id="card-tanker-capacity">
+          <div class="upgrade-card-top">
+            <span class="upgrade-icon">🛢️</span>
+            <div class="upgrade-info">
+              <span class="upgrade-title">ВМЕСТИМОСТЬ ТРЮМОВ</span>
+              <span id="tanker-cap-lvl" class="upgrade-level cyan-text">УРОВЕНЬ 1 / 5</span>
+            </div>
+          </div>
+          <div class="upgrade-stat-row">
+            <span class="stat-label">Объём партии:</span>
+            <strong id="tanker-cap-stat" class="stat-value">2 000 ➔ 3 500 барр.</strong>
+          </div>
+          <button id="btn-upgrade-tanker-capacity" class="btn-upgrade-action" type="button">
+            <span class="btn-upgrade-label">МОДЕРНИЗАЦИЯ ТРЮМОВ</span>
+            <span id="tanker-cap-cost" class="btn-upgrade-cost gold-text">150 000 ₽</span>
+          </button>
+        </div>
+
+        <!-- Upgrade 2: Azipod Speed -->
+        <div class="tanker-upgrade-card" id="card-tanker-speed">
+          <div class="upgrade-card-top">
+            <span class="upgrade-icon">⚡</span>
+            <div class="upgrade-info">
+              <span class="upgrade-title">СКОРОСТЬ РЕЙСА (AZIPOD)</span>
+              <span id="tanker-spd-lvl" class="upgrade-level cyan-text">УРОВЕНЬ 1 / 5</span>
+            </div>
+          </div>
+          <div class="upgrade-stat-row">
+            <span class="stat-label">Длительность рейса:</span>
+            <strong id="tanker-spd-stat" class="stat-value">60 с ➔ 45 с</strong>
+          </div>
+          <button id="btn-upgrade-tanker-speed" class="btn-upgrade-action" type="button">
+            <span class="btn-upgrade-label">ФОРСИРОВАНИЕ ВИНТОВ</span>
+            <span id="tanker-spd-cost" class="btn-upgrade-cost gold-text">100 000 ₽</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Cargo Manifest Section -->
+      <div class="tanker-cargo-section">
+        <div class="cargo-section-header">
+          <div class="cargo-header-left">
+            <span class="cargo-icon-badge">📦</span>
+            <div class="cargo-title-group">
+              <span class="cargo-section-title">МАНИФЕСТ ТРЮМОВ</span>
+              <span id="tanker-hold-summary" class="cargo-summary-badge cyan-text">0 / 2 000 барр.</span>
+            </div>
+          </div>
+          <button id="btn-tanker-autoload" class="btn-autoload-action" type="button">
+            ⚡ ЗАГРУЗИТЬ ВСЁ
+          </button>
+        </div>
+        <div class="tanker-hold-bar-track">
+          <div id="tanker-hold-bar-fill" class="tanker-hold-bar-fill gold-fill" style="width: 0%;"></div>
+        </div>
+        <div id="tanker-cargo-list" class="tanker-cargo-list"></div>
+      </div>
+
+      <!-- Active Dispatch Action Button -->
+      <div class="tanker-dispatch-footer">
+        <div class="dispatch-hint-bar">
+          <span id="tanker-dispatch-hint" class="dispatch-hint-text">Загрузите сырьё в трюмы для отправки танкера в рейс</span>
+        </div>
+        <button id="btn-dispatch-tanker" class="btn-primary-dispatch" type="button" disabled>
+          <span class="dispatch-btn-icon">⚓</span>
+          <div class="dispatch-btn-text-group">
+            <span class="dispatch-btn-title">ОТПРАВИТЬ ТАНКЕР В РЕЙС</span>
+            <span class="dispatch-btn-sub">Арктический рейс по трассе СМП • Выручка в ₽ и $</span>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>  <!-- TOWNSHIP ACTION DOCK (Clean, modern floating bottom navigation) -->
+  <nav id="township-dock" class="township-dock" aria-label="Панель действий промысла">
+    <button id="dock-btn-contracts" class="dock-btn" type="button" title="Доска региональных контрактов СМП">
+      <span class="dock-icon">📋</span>
+      <span class="dock-label">Заказы</span>
+    </button>
+    <button id="dock-btn-settlement" class="dock-btn" type="button" title="Вахтовый посёлок и баланс смен">
+      <span class="dock-icon">🏠</span>
+      <span class="dock-label">Посёлок</span>
+    </button>
+    <button id="dock-btn-industrial" class="dock-btn" type="button" title="Промышленный сектор: НПЗ, ГПЗ, НГХК">
+      <span class="dock-icon">🏭</span>
+      <span class="dock-label">Промсектор</span>
+    </button>
+    <button id="dock-btn-megaproject" class="dock-btn" type="button" title="Мегапроект «Ямал-СПГ»">
+      <span class="dock-icon">🏆</span>
+      <span class="dock-label">«Ямал-СПГ»</span>
+    </button>
+    <button id="dock-btn-market" class="dock-btn" type="button" title="Маркетплейс технологий">
+      <span class="dock-icon">🛒</span>
+      <span class="dock-label">Маркет</span>
+    </button>
+  </nav>
+
+  <!-- TOWNSHIP BUILDING MOVE MODE HUD -->
+  <div id="building-move-hud" class="building-move-hud hidden" role="region" aria-label="Панель перестановки">
+    <div class="move-hud-info">
+      <span class="move-hud-badge">🏗️ РЕЖИМ ПЕРЕСТАНОВКИ</span>
+      <span class="move-hud-hint">Перетаскивайте здания пальцем по сетке промысла</span>
+    </div>
+    <div class="move-hud-actions">
+      <button id="btn-move-reset" class="btn-move-action btn-move-reset" type="button" title="Сбросить на исходные позиции">
+        ↺ СБРОС
+      </button>
+      <button id="btn-move-confirm" class="btn-move-action btn-move-confirm" type="button" title="Сохранить новую расстановку">
+        ✓ ГОТОВО
+      </button>
+    </div>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+  </body></html>

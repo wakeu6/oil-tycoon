@@ -1,0 +1,15 @@
+# Ignore local tools and binaries
+scripts/cloudflared.exe
+*.backup.js
+*.backup.html
+*.backup.css
+*.bak
+*.tmp
+*.zip
+
+# Ignore agent logs and IDE caches
+.agent/
+.agents/
+.vscode/
+.idea/
+npm-debug.log*
