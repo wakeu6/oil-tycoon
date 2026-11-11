@@ -1,5 +1,25 @@
 import { BasePlatformAdapter } from "./base-adapter.js";
 
+export function detectAdBlock() {
+  if (typeof document === "undefined") return false;
+  try {
+    const bait = document.createElement("div");
+    bait.className = "pub_300x250 pub_300x250m pub_728x90 text-ad textAd text_ad text_ads text-ads text-ad-links";
+    bait.style.cssText = "width:1px!important;height:1px!important;position:absolute!important;left:-10000px!important;top:-10000px!important;";
+    document.body.appendChild(bait);
+    const isHidden = (
+      bait.offsetParent === null ||
+      bait.offsetHeight === 0 ||
+      bait.offsetLeft === 0 ||
+      window.getComputedStyle(bait).display === "none" ||
+      window.getComputedStyle(bait).visibility === "hidden"
+    );
+    bait.remove();
+    if (isHidden) return true;
+  } catch (_) {}
+  return false;
+}
+
 /**
  * VkAdapter
  * Native adapter for VK Mini Apps and VK Play web bridge.
@@ -52,6 +72,16 @@ export class VkAdapter extends BasePlatformAdapter {
   showRewardedAd({ onOpen, onRewarded, onClose, onError }) {
     if (typeof window === "undefined" || !window.vkBridge) {
       if (onError) onError(new Error("VK Bridge not available"));
+      if (onClose) onClose(false);
+      return;
+    }
+
+    // Check if AdBlock extension is blocking ads
+    if (detectAdBlock()) {
+      const err = new Error("AdBlock detected");
+      err.isAdBlock = true;
+      if (onError) onError(err);
+      if (onClose) onClose(false);
       return;
     }
 
@@ -64,39 +94,22 @@ export class VkAdapter extends BasePlatformAdapter {
     })
       .then((data) => {
         if (data && data.result) {
+          // STRICT RULE: Award bonus ONLY when ad was fully watched
           if (onRewarded) onRewarded();
-          if (onClose) onClose();
+          if (onClose) onClose(true);
         } else {
-          // If rewarded video returned false, attempt direct interstitial fallback
-          this.triggerFallbackAd(onRewarded, onClose, onError);
+          // User closed ad prematurely or ad returned result: false -> NO REWARD
+          const err = new Error("Ad was not completed");
+          err.wasClosedEarly = true;
+          if (onError) onError(err);
+          if (onClose) onClose(false);
         }
       })
       .catch((err) => {
-        console.warn("[VkAdapter] Rewarded ad returned error (e.g. no video fill on desktop):", err);
-        this.triggerFallbackAd(onRewarded, onClose, onError);
-      });
-  }
-
-  triggerFallbackAd(onRewarded, onClose, onError) {
-    if (typeof window === "undefined" || !window.vkBridge) {
-      if (onRewarded) onRewarded();
-      if (onClose) onClose();
-      return;
-    }
-
-    window.vkBridge.send("VKWebAppShowNativeAds", { ad_format: "interstitial" })
-      .then((res) => {
-        if (onRewarded) onRewarded();
-        if (onClose) onClose();
-      })
-      .catch((fallbackErr) => {
-        console.warn("[VkAdapter] Interstitial fallback also had no fill/blocked:", fallbackErr);
-        // Player intended to watch ad: grant bonus with toast so user flow is never blocked
-        if (typeof window !== "undefined" && typeof window.showToast === "function") {
-          window.showToast("Спонсорский бонус начислен!");
-        }
-        if (onRewarded) onRewarded();
-        if (onClose) onClose();
+        console.warn("[VkAdapter] Rewarded ad failed (no fill or blocked):", err);
+        // STRICT RULE: Do not grant bonus if ad could not be served or was blocked
+        if (onError) onError(err);
+        if (onClose) onClose(false);
       });
   }
 

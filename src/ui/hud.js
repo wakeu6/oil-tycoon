@@ -225,11 +225,7 @@ export class HudView {
             if (typeof audio?.playBoost === "function") audio.playBoost();
             if (typeof window.showToast === "function") window.showToast("⚡ Дебит x2 удвоен на 3 мин!");
           },
-          onError: () => {
-            state.activateBoost(180, 2.0);
-            if (typeof audio?.playBoost === "function") audio.playBoost();
-            if (typeof window.showToast === "function") window.showToast("⚡ Спонсорский буст: дебит x2 активен!");
-          }
+          onError: () => {}
         });
       });
     }

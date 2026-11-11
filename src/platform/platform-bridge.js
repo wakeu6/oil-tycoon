@@ -4,6 +4,20 @@ import { VkAdapter } from "./adapters/vk-adapter.js";
 import { RuStoreAdapter } from "./adapters/rustore-adapter.js";
 import { MockAdapter } from "./adapters/mock-adapter.js";
 
+export function isAdBlockError(err) {
+  if (!err) return false;
+  if (err.isAdBlock) return true;
+  const str = String(err.message || err.error_type || err.error_data?.error_reason || JSON.stringify(err)).toLowerCase();
+  return (
+    str.includes("adblock") ||
+    str.includes("block") ||
+    str.includes("filter") ||
+    str.includes("extension") ||
+    str.includes("failed to fetch") ||
+    str.includes("err_blocked_by_client")
+  );
+}
+
 export function showToast(message, duration = 3000) {
   if (typeof document === "undefined") return;
   let toast = document.getElementById("game-toast");
@@ -186,20 +200,26 @@ export class PlatformBridge {
     };
 
     const handleError = (err) => {
-      console.warn("[PlatformBridge] Rewarded ad error (fallback activated):", err);
+      console.warn("[PlatformBridge] Rewarded ad error:", err);
       this.isAdShowing = false;
       audio.setAdMuted(false);
       this.setFreeze(false);
       this.startGameplay();
-      if (!rewarded) {
-        rewarded = true;
-        if (typeof showToast === "function") {
-          showToast("Спонсорский бонус начислен!");
+
+      // STRICT BUSINESS RULE:
+      // DO NOT award bonuses if there is no ad, if ad was closed early, or if AdBlock is active!
+      if (typeof showToast === "function") {
+        if (isAdBlockError(err)) {
+          showToast("⚠️ Отключите AdBlock, чтобы получить бонус!");
+        } else if (err?.wasClosedEarly) {
+          showToast("ℹ️ Реклама не была досмотрена — бонус не начислен.");
+        } else {
+          showToast("ℹ️ Реклама сейчас недоступна. Попробуйте позже.");
         }
-        if (onRewarded) onRewarded();
       }
+
       if (onError) onError(err);
-      if (onClose) onClose(true);
+      if (onClose) onClose(false);
     };
 
     if (this.adapter) {

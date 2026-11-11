@@ -2356,14 +2356,14 @@ export class Isometric3D {
     const isUnlocked = well && well.unlocked && well.level > 0;
     const wellCount = state.getWellsCountOnPad ? state.getWellsCountOnPad(cfg.id) : (isUnlocked ? 2 : 0);
 
-    // Concrete Slab with Yellow Hazard Border (22 x 14 units)
-    const padW = 22, padL = 14;
+    // Concrete Slab with Yellow Hazard Border (Exact 5x4 Cells = 17.5m x 14.0m)
+    const padW = 17.5, padL = 14.0;
     const pad = new THREE.Mesh(new THREE.BoxGeometry(padW, 0.8, padL), this.mat.concrete);
     pad.position.y = 0.4;
     pad.receiveShadow = true;
     padGroup.add(pad);
 
-    const hazard = new THREE.Mesh(new THREE.BoxGeometry(padW + 0.3, 0.2, padL + 0.3), this.mat.hazardStripe);
+    const hazard = new THREE.Mesh(new THREE.BoxGeometry(padW + 0.1, 0.2, padL + 0.1), this.mat.hazardStripe);
     hazard.position.y = 0.1;
     padGroup.add(hazard);
 
@@ -2402,14 +2402,14 @@ export class Isometric3D {
 
       // Physical Roadside Information Board for Wellpad
       const wellSign = this.createPhysicalSignboard(cfg.name, "🛢️", "#00a3e0", 6.8, 2.2);
-      wellSign.position.set(padW / 2 - 3.8, 2.0, padL / 2 - 1.2);
+      wellSign.position.set(padW / 2 - 2.8, 2.0, padL / 2 - 1.2);
       wellSign.rotation.y = -0.35;
       padGroup.add(wellSign);
     } else {
       const def = CONFIG.WELLS.find(w => w.id === cfg.id);
       const cost = def ? def.unlockCost : 500;
 
-      [[-9, -5], [9, -5], [9, 5], [-9, 5]].forEach(([cx, cz]) => {
+      [[-padW / 2 + 1, -padL / 2 + 1], [padW / 2 - 1, -padL / 2 + 1], [padW / 2 - 1, padL / 2 - 1], [-padW / 2 + 1, padL / 2 - 1]].forEach(([cx, cz]) => {
         const post = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 4.0, 8), this.mat.greyWall);
         post.position.set(cx, 2.0, cz);
         padGroup.add(post);
@@ -2431,12 +2431,12 @@ export class Isometric3D {
       padGroup.add(billboard);
     }
 
-    // Volume Hitbox for Rock-Solid Clicks
+    // Volume Hitbox tightly constrained to pad footprint (zero overhang)
     const hitbox = new THREE.Mesh(
-      new THREE.BoxGeometry(padW + 2, 16, padL + 2),
+      new THREE.BoxGeometry(padW - 0.2, 5.0, padL - 0.2),
       new THREE.MeshBasicMaterial({ visible: false })
     );
-    hitbox.position.y = 8;
+    hitbox.position.y = 2.5;
     padGroup.add(hitbox);
 
     padGroup.userData = {
@@ -2447,9 +2447,9 @@ export class Isometric3D {
       isUnlocked: isUnlocked
     };
 
-    // Recursively register all meshes inside padGroup to interactables
+    // Recursively register meshes inside padGroup to interactables
     padGroup.traverse(child => {
-      if (child.isMesh) {
+      if (child.isMesh && !child.userData?.noRaycast) {
         child.userData = padGroup.userData;
         this.interactables.push(child);
       }
@@ -2670,11 +2670,13 @@ export class Isometric3D {
       plantGroup.add(curb);
     });
 
-    // Soft Ambient Occlusion Contact Shadow on Snow
+    // Soft Ambient Occlusion Contact Shadow on Snow (Non-interactive visual decor)
+    let shadowPlane = null;
     if (this.mat.contactShadow) {
-      const shadowPlane = new THREE.Mesh(new THREE.PlaneGeometry(32, 25), this.mat.contactShadow);
+      shadowPlane = new THREE.Mesh(new THREE.PlaneGeometry(32, 25), this.mat.contactShadow);
       shadowPlane.rotation.x = -Math.PI / 2;
       shadowPlane.position.set(0, 0.04, 0);
+      shadowPlane.userData = { isDecorative: true, noRaycast: true };
       plantGroup.add(shadowPlane);
     }
 
@@ -2946,12 +2948,12 @@ export class Isometric3D {
     lamp.position.set(bodyX, baseH + 3.28, bodyZ + bodyD / 2 + 0.8);
     plantGroup.add(lamp);
 
-    // Click Volume Hitbox
+    // Click Volume Hitbox strictly fitted to base platform (zero lateral or vertical overhang)
     const hitbox = new THREE.Mesh(
-      new THREE.BoxGeometry(28, 18, 21),
+      new THREE.BoxGeometry(baseW - 0.2, 1.2, baseD - 0.2),
       new THREE.MeshBasicMaterial({ visible: false })
     );
-    hitbox.position.y = 9;
+    hitbox.position.y = 0.6;
     plantGroup.add(hitbox);
 
     plantGroup.userData = {
@@ -2962,7 +2964,7 @@ export class Isometric3D {
     };
 
     plantGroup.traverse(child => {
-      if (child.isMesh) {
+      if (child.isMesh && child !== shadowPlane && !child.userData?.noRaycast) {
         child.userData = plantGroup.userData;
         this.interactables.push(child);
       }
@@ -3089,8 +3091,9 @@ export class Isometric3D {
       spread: 0.35
     });
 
-    const canHitbox = new THREE.Mesh(new THREE.BoxGeometry(10.5, 8, 10.5), new THREE.MeshBasicMaterial({ visible: false }));
-    canHitbox.position.y = 4;
+    // Canteen Volume Hitbox strictly fitted inside 10.5m x 10.5m base footprint
+    const canHitbox = new THREE.Mesh(new THREE.BoxGeometry(10.2, 4.8, 10.2), new THREE.MeshBasicMaterial({ visible: false }));
+    canHitbox.position.y = 2.4;
     canteen.add(canHitbox);
 
     canteen.userData = {
@@ -3101,7 +3104,7 @@ export class Isometric3D {
     };
 
     canteen.traverse(child => {
-      if (child.isMesh && !canSmokePuffs.includes(child)) {
+      if (child.isMesh && !canSmokePuffs.includes(child) && !child.userData?.noRaycast) {
         child.userData = canteen.userData;
         this.interactables.push(child);
       }
@@ -3379,8 +3382,9 @@ export class Isometric3D {
       spread: 0.4
     });
 
-    const dormHitbox = new THREE.Mesh(new THREE.BoxGeometry(16, 14, 13), new THREE.MeshBasicMaterial({ visible: false }));
-    dormHitbox.position.y = 7;
+    // Dormitory Volume Hitbox strictly fitted inside 14.0m x 10.5m base footprint
+    const dormHitbox = new THREE.Mesh(new THREE.BoxGeometry(13.8, 6.2, 10.3), new THREE.MeshBasicMaterial({ visible: false }));
+    dormHitbox.position.y = 3.1;
     dorm.add(dormHitbox);
 
     dorm.userData = {
@@ -3391,7 +3395,7 @@ export class Isometric3D {
     };
 
     dorm.traverse(child => {
-      if (child.isMesh && !dormSmokePuffs.includes(child)) {
+      if (child.isMesh && !dormSmokePuffs.includes(child) && !child.userData?.noRaycast) {
         child.userData = dorm.userData;
         this.interactables.push(child);
       }
@@ -3412,10 +3416,11 @@ export class Isometric3D {
     gateIsland.receiveShadow = true;
     gate.add(gateIsland);
 
-    // Enlarged concrete apron extension for heavy machinery and 6x6 TREKOL passage
+    // Enlarged concrete apron extension for heavy machinery and 6x6 TREKOL passage (decorative ground)
     const gateApronExt = new THREE.Mesh(new THREE.BoxGeometry(11.5, 0.4, 16.0), this.mat.concrete);
     gateApronExt.position.set(0, 0.22, -3.0);
     gateApronExt.receiveShadow = true;
+    gateApronExt.userData = { isDecorative: true, noRaycast: true };
     gate.add(gateApronExt);
 
     // Phase 14 exact parameter match: Officer Guard Booth (5.4 x 4.2 x 4.4) on North side
@@ -3646,7 +3651,7 @@ export class Isometric3D {
     };
 
     gate.traverse(child => {
-      if (child.isMesh) {
+      if (child.isMesh && !child.userData?.noRaycast) {
         child.userData = gate.userData;
         this.interactables.push(child);
       }
@@ -3817,8 +3822,9 @@ export class Isometric3D {
       garageGroup.add(tire);
     }
 
-    const gHitbox = new THREE.Mesh(new THREE.BoxGeometry(22, 12, 15), new THREE.MeshBasicMaterial({ visible: false }));
-    gHitbox.position.y = 6;
+    // Garage Volume Hitbox strictly fitted inside 17.5m x 14.0m base footprint
+    const gHitbox = new THREE.Mesh(new THREE.BoxGeometry(17.3, 6.8, 13.8), new THREE.MeshBasicMaterial({ visible: false }));
+    gHitbox.position.y = 3.4;
     garageGroup.add(gHitbox);
 
     garageGroup.userData = {
@@ -3829,7 +3835,7 @@ export class Isometric3D {
     };
 
     garageGroup.traverse(child => {
-      if (child.isMesh) {
+      if (child.isMesh && !child.userData?.noRaycast) {
         child.userData = garageGroup.userData;
         this.interactables.push(child);
       }
@@ -4125,8 +4131,9 @@ export class Isometric3D {
       });
     }
 
-    const rdHitbox = new THREE.Mesh(new THREE.BoxGeometry(22, 14, 16), new THREE.MeshBasicMaterial({ visible: false }));
-    rdHitbox.position.y = 7;
+    // RD Office Volume Hitbox strictly fitted inside 21.0m x 14.0m base footprint
+    const rdHitbox = new THREE.Mesh(new THREE.BoxGeometry(20.8, 6.8, 13.8), new THREE.MeshBasicMaterial({ visible: false }));
+    rdHitbox.position.y = 3.4;
     rdGroup.add(rdHitbox);
 
     rdGroup.userData = {
@@ -4137,7 +4144,7 @@ export class Isometric3D {
     };
 
     rdGroup.traverse(child => {
-      if (child.isMesh) {
+      if (child.isMesh && !child.userData?.noRaycast) {
         child.userData = rdGroup.userData;
         this.interactables.push(child);
       }
@@ -6061,8 +6068,8 @@ export class Isometric3D {
     board.position.set(0, 18.0, 0);
     complexGroup.add(board);
 
-    const hitbox = new THREE.Mesh(new THREE.BoxGeometry(50, 26, 38), new THREE.MeshBasicMaterial({ visible: false }));
-    hitbox.position.set(0, 13, 0);
+    const hitbox = new THREE.Mesh(new THREE.BoxGeometry(34.8, 12, 27.8), new THREE.MeshBasicMaterial({ visible: false }));
+    hitbox.position.set(0, 6, 0);
     complexGroup.add(hitbox);
 
     const userData = {
@@ -6274,8 +6281,8 @@ export class Isometric3D {
     board.position.set(0, 17.5, 0);
     complexGroup.add(board);
 
-    const hitbox = new THREE.Mesh(new THREE.BoxGeometry(48, 24, 36), new THREE.MeshBasicMaterial({ visible: false }));
-    hitbox.position.set(0, 12, 0);
+    const hitbox = new THREE.Mesh(new THREE.BoxGeometry(34.8, 12, 27.8), new THREE.MeshBasicMaterial({ visible: false }));
+    hitbox.position.set(0, 6, 0);
     complexGroup.add(hitbox);
 
     const userData = {
@@ -6473,8 +6480,8 @@ export class Isometric3D {
     board.position.set(0, 18.0, 0);
     complexGroup.add(board);
 
-    const hitbox = new THREE.Mesh(new THREE.BoxGeometry(50, 26, 38), new THREE.MeshBasicMaterial({ visible: false }));
-    hitbox.position.set(0, 13, 0);
+    const hitbox = new THREE.Mesh(new THREE.BoxGeometry(34.8, 12, 27.8), new THREE.MeshBasicMaterial({ visible: false }));
+    hitbox.position.set(0, 6, 0);
     complexGroup.add(hitbox);
 
     const userData = {
@@ -6644,8 +6651,8 @@ export class Isometric3D {
     board.position.set(0, 16.0, 0);
     complexGroup.add(board);
 
-    const hitbox = new THREE.Mesh(new THREE.BoxGeometry(54, 20, 42), new THREE.MeshBasicMaterial({ visible: false }));
-    hitbox.position.set(0, 10, 0);
+    const hitbox = new THREE.Mesh(new THREE.BoxGeometry(34.8, 12, 27.8), new THREE.MeshBasicMaterial({ visible: false }));
+    hitbox.position.set(0, 6, 0);
     complexGroup.add(hitbox);
 
     const userData = {
@@ -7152,6 +7159,47 @@ export class Isometric3D {
     if (typeof audio?.playTap === "function") audio.playTap();
   }
 
+  getValidInteractiveHit(e, intersects) {
+    if (!intersects || intersects.length === 0) return null;
+    const groundPoint = this.raycastGroundPlane(e);
+
+    for (let i = 0; i < intersects.length; i++) {
+      const item = intersects[i];
+      let obj = item.object;
+      if (!obj || obj.userData?.isDecorative || obj.userData?.noRaycast) continue;
+
+      let target = obj;
+      while (target && !target.userData?.type && target.parent) {
+        target = target.parent;
+      }
+      if (!target || !target.userData?.type) continue;
+
+      const d = target.userData;
+      const bId = d.buildingId || d.id;
+      const entry = bId && this.movableBuildings ? this.movableBuildings.get(bId) : null;
+
+      // If hit is near foundation / ground level (item.point.y < 3.2), verify click landed inside building's footprint
+      if (entry && item.point && item.point.y < 3.2 && groundPoint) {
+        const sz = entry.size || { w: 10.5, d: 10.5 };
+        const halfW = (sz.w || (sz.cellsW ? sz.cellsW * 3.5 : 10.5)) / 2;
+        const halfD = (sz.d || (sz.cellsD ? sz.cellsD * 3.5 : 10.5)) / 2;
+        const grpPos = entry.group.position;
+        const minX = grpPos.x - halfW - 0.25;
+        const maxX = grpPos.x + halfW + 0.25;
+        const minZ = grpPos.z - halfD - 0.25;
+        const maxZ = grpPos.z + halfD + 0.25;
+
+        // Ground point landed outside the building's physical footprint -> snow / empty yard click!
+        if (groundPoint.x < minX || groundPoint.x > maxX || groundPoint.z < minZ || groundPoint.z > maxZ) {
+          continue;
+        }
+      }
+
+      return { object: obj, target, point: item.point, item };
+    }
+    return null;
+  }
+
   // --- 11. ROBUST RAYCASTING & UPGRADE SHEET ACTIVATION ---
   initInteractionEvents() {
     const canvas = this.canvas;
@@ -7174,11 +7222,12 @@ export class Isometric3D {
       this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
       this.raycaster.setFromCamera(this.mouse, this.camera);
       const intersects = this.raycaster.intersectObjects(this.interactables, true);
+      const validHit = this.getValidInteractiveHit(e, intersects);
 
       let targetMovableId = null;
       let targetMovableGroup = null;
-      if (intersects.length > 0) {
-        let hit = intersects[0].object;
+      if (validHit) {
+        let hit = validHit.target;
         while (hit) {
           const bId = hit.userData?.buildingId || hit.userData?.id;
           if (bId && this.movableBuildings && this.movableBuildings.has(bId)) {
@@ -7345,12 +7394,11 @@ export class Isometric3D {
 
       this.raycaster.setFromCamera(this.mouse, this.camera);
       const intersects = this.raycaster.intersectObjects(this.interactables, true);
+      const validHit = this.getValidInteractiveHit(e, intersects);
 
-      if (intersects.length > 0) {
-        let hit = intersects[0].object;
-        while (hit && !hit.userData?.type && hit.parent) {
-          hit = hit.parent;
-        }
+      if (validHit) {
+        let hit = validHit.target;
+        const hitPoint = validHit.point || (intersects[0] ? intersects[0].point : this.raycastGroundPlane(e));
 
         if (hit && hit.userData?.type) {
           const d = hit.userData;
@@ -7378,7 +7426,7 @@ export class Isometric3D {
             const well = state.wells[d.id];
             if (!well?.unlocked) {
               const def = CONFIG.WELLS.find(w => w.id === d.id);
-              this.spawn3DFloatingText(intersects[0].point, `🔒 ${def ? def.unlockCost.toLocaleString("ru-RU") : ""} ₽`, "#f87171");
+              this.spawn3DFloatingText(hitPoint, `🔒 ${def ? def.unlockCost.toLocaleString("ru-RU") : ""} ₽`, "#f87171");
             }
             state.setActiveWell(d.id);
             state.emit("openWellUpgradeSheet", { wellId: d.id });
@@ -7412,7 +7460,7 @@ export class Isometric3D {
               const bonus = 0.5;
               if (typeof state.addCrypto === "function") state.addCrypto(bonus);
               this.trauma = Math.min(1.0, this.trauma + 0.25);
-              this.spawn3DFloatingText(intersects[0].point, `🔥 ПРОДУВКА! +${bonus} ⚡`, "#f59e0b");
+              this.spawn3DFloatingText(hitPoint, `🔥 ПРОДУВКА! +${bonus} ⚡`, "#f59e0b");
             }
             return;
           } else if (d.type === "trekol_rover") {
@@ -7427,23 +7475,23 @@ export class Isometric3D {
             this.trauma = Math.min(1.0, this.trauma + 0.15);
             if (res && res.stuckCleared) {
               state.addMoney(1000);
-              this.spawn3DFloatingText(intersects[0].point, "🚜 СНЕГ РАСЧИЩЕН! +1 000 ₽", "#22c55e");
+              this.spawn3DFloatingText(hitPoint, "🚜 СНЕГ РАСЧИЩЕН! +1 000 ₽", "#22c55e");
             } else if (res && res.shoveled) {
-              this.spawn3DFloatingText(intersects[0].point, `❄️ РАСЧИСТКА: ${Math.round(res.progress)}%`, "#38bdf8");
+              this.spawn3DFloatingText(hitPoint, `❄️ РАСЧИСТКА: ${Math.round(res.progress)}%`, "#38bdf8");
             } else if (res && res.honked) {
               const modelLabel = d.modelName || res.model || "ТРЭКОЛ 39294 (6х6)";
-              this.spawn3DFloatingText(intersects[0].point, `🚜 ${modelLabel}! 📯`, "#38bdf8");
+              this.spawn3DFloatingText(hitPoint, `🚜 ${modelLabel}! 📯`, "#38bdf8");
             } else {
-              this.spawn3DFloatingText(intersects[0].point, "🛞 ТРЭКОЛ: ОБХОД КУСТОВ", "#00a3e0");
+              this.spawn3DFloatingText(hitPoint, "🛞 ТРЭКОЛ: ОБХОД КУСТОВ", "#00a3e0");
             }
             return;
           } else if (d.type === "well_cluster_expansion") {
             this.trauma = Math.min(1.0, this.trauma + 0.12);
-            this.spawn3DFloatingText(intersects[0].point, `⛽ ${d.name} • ${d.badge}`, "#22c55e");
+            this.spawn3DFloatingText(hitPoint, `⛽ ${d.name} • ${d.badge}`, "#22c55e");
             return;
           } else if (d.type === "tycoon_infrastructure") {
             this.trauma = Math.min(1.0, this.trauma + 0.08);
-            this.spawn3DFloatingText(intersects[0].point, `⚙️ ${d.name} • ${d.badge}`, "#00a3e0");
+            this.spawn3DFloatingText(hitPoint, `⚙️ ${d.name} • ${d.badge}`, "#00a3e0");
             return;
           } else if (d.type === "locked_sector") {
             const sid = d.sectorId;
@@ -7452,38 +7500,38 @@ export class Isometric3D {
             if (state.money >= cost) {
               if (state.unlockSector(sid)) {
                 this.trauma = Math.min(1.0, this.trauma + 0.2);
-                this.spawn3DFloatingText(intersects[0].point, `★ ${d.name} РАЗБЛОКИРОВАН! ★`, "#22c55e");
+                this.spawn3DFloatingText(hitPoint, `★ ${d.name} РАЗБЛОКИРОВАН! ★`, "#22c55e");
                 if (typeof audio?.playUpgrade === "function") audio.playUpgrade();
               }
             } else {
-              this.spawn3DFloatingText(intersects[0].point, `🔒 Требуется ${cost.toLocaleString("ru-RU")} ₽`, "#ef4444");
+              this.spawn3DFloatingText(hitPoint, `🔒 Требуется ${cost.toLocaleString("ru-RU")} ₽`, "#ef4444");
               if (typeof audio?.playError === "function") audio.playError();
             }
             return;
           } else if (d.type === "refinery_sector") {
             this.trauma = Math.min(1.0, this.trauma + 0.12);
             state.emit("openRefineryModal");
-            this.spawn3DFloatingText(intersects[0].point, `⛽ ${d.name}`, "#22c55e");
+            this.spawn3DFloatingText(hitPoint, `⛽ ${d.name}`, "#22c55e");
             return;
           } else if (d.type === "gas_plant_sector") {
             this.trauma = Math.min(1.0, this.trauma + 0.12);
             state.emit("openGasPlantModal");
-            this.spawn3DFloatingText(intersects[0].point, `❄️ ${d.name}`, "#38bdf8");
+            this.spawn3DFloatingText(hitPoint, `❄️ ${d.name}`, "#38bdf8");
             return;
           } else if (d.type === "petrochem_sector") {
             this.trauma = Math.min(1.0, this.trauma + 0.12);
             state.emit("openPetrochemModal");
-            this.spawn3DFloatingText(intersects[0].point, `🧪 ${d.name}`, "#a855f7");
+            this.spawn3DFloatingText(hitPoint, `🧪 ${d.name}`, "#a855f7");
             return;
           } else if (d.type === "storage_sector") {
             this.trauma = Math.min(1.0, this.trauma + 0.12);
             state.emit("openStorageModal");
-            this.spawn3DFloatingText(intersects[0].point, `🛢️ ${d.name}`, "#00a3e0");
+            this.spawn3DFloatingText(hitPoint, `🛢️ ${d.name}`, "#00a3e0");
             return;
           } else if (d.type === "arctic_tanker" || d.type === "marine_terminal") {
             this.trauma = Math.min(1.0, this.trauma + 0.15);
             state.emit("openMarineExportModal");
-            this.spawn3DFloatingText(intersects[0].point, `🚢 ${d.name} • ${d.badge}`, "#38bdf8");
+            this.spawn3DFloatingText(hitPoint, `🚢 ${d.name} • ${d.badge}`, "#38bdf8");
             return;
           }
         }
