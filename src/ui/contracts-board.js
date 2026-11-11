@@ -86,6 +86,7 @@ export class ContractsBoardView {
 
   open() {
     if (!this.modalEl) return;
+    this.state?.emit?.("closeAllBottomSheets");
     this.modalEl.classList.remove("hidden");
     this.render();
 

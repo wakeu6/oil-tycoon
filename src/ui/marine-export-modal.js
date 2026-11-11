@@ -33,17 +33,39 @@ export class MarineExportModalView {
 
     this.closeBtn = document.getElementById("btn-close-marine-modal");
     if (this.closeBtn) {
-      this.closeBtn.addEventListener("click", () => this.close());
+      const handleClose = (e) => {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        this.close();
+      };
+      this.closeBtn.addEventListener("click", handleClose);
+      this.closeBtn.addEventListener("pointerup", handleClose);
     }
 
     this.modalEl.addEventListener("click", (e) => {
       if (e.target === this.modalEl) this.close();
     });
 
+    if (typeof window !== "undefined") {
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && this.isOpen()) {
+          this.close();
+        }
+      });
+    }
+
     // Wire HUD button if present
     const hudBtn = document.getElementById("btn-open-marine");
     if (hudBtn) {
-      hudBtn.addEventListener("click", () => this.open());
+      hudBtn.addEventListener("click", () => {
+        if (typeof window !== "undefined" && window.townshipCoordinator) {
+          window.townshipCoordinator.switchTo("marine");
+        } else {
+          this.open();
+        }
+      });
     }
 
     // Bind state events
@@ -109,12 +131,37 @@ export class MarineExportModalView {
     // Dispatch Tanker
     const btnDispatch = document.getElementById("btn-dispatch-tanker");
     if (btnDispatch) {
-      btnDispatch.addEventListener("click", () => {
+      let dispatching = false;
+      const handleDispatch = (e) => {
+        if (e) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        if (dispatching) return;
+        dispatching = true;
+        setTimeout(() => { dispatching = false; }, 400);
+
+        if (this.state.marineTerminal) {
+          this.state.marineTerminal.unlocked = true;
+        }
+
         if (this.state.dispatchTanker) {
-          this.state.dispatchTanker();
+          const success = this.state.dispatchTanker();
+          if (success) {
+            try {
+              if (typeof audio?.playShipHorn === "function") {
+                audio.playShipHorn();
+              } else if (typeof audio?.playHorn === "function") {
+                audio.playHorn();
+              }
+            } catch (err) {}
+          }
           this.render();
         }
-      });
+      };
+
+      btnDispatch.addEventListener("click", handleDispatch);
+      btnDispatch.addEventListener("pointerup", handleDispatch);
     }
   }
 
@@ -124,7 +171,13 @@ export class MarineExportModalView {
 
   open() {
     if (!this.modalEl) return;
+    this.state?.emit?.("closeAllBottomSheets");
+    if (this.state && this.state.marineTerminal) {
+      this.state.marineTerminal.unlocked = true;
+    }
     this.modalEl.classList.remove("hidden");
+    const dock = document.getElementById("township-dock");
+    if (dock) dock.classList.add("dock-hidden-by-sheet");
     this.render();
 
     if (this.liveTimer) clearInterval(this.liveTimer);
@@ -134,9 +187,14 @@ export class MarineExportModalView {
   close() {
     if (!this.modalEl) return;
     this.modalEl.classList.add("hidden");
+    const dock = document.getElementById("township-dock");
+    if (dock) dock.classList.remove("dock-hidden-by-sheet");
     if (this.liveTimer) {
       clearInterval(this.liveTimer);
       this.liveTimer = null;
+    }
+    if (typeof window !== "undefined" && window.townshipCoordinator) {
+      window.townshipCoordinator.syncActiveButton();
     }
   }
 

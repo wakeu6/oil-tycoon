@@ -4,6 +4,26 @@ import { VkAdapter } from "./adapters/vk-adapter.js";
 import { RuStoreAdapter } from "./adapters/rustore-adapter.js";
 import { MockAdapter } from "./adapters/mock-adapter.js";
 
+export function showToast(message, duration = 3000) {
+  if (typeof document === "undefined") return;
+  let toast = document.getElementById("game-toast");
+  if (!toast) {
+    toast = document.createElement("div");
+    toast.id = "game-toast";
+    document.body.appendChild(toast);
+  }
+  toast.textContent = message;
+  toast.classList.add("toast-show");
+  clearTimeout(toast._timeout);
+  toast._timeout = setTimeout(() => {
+    toast.classList.remove("toast-show");
+  }, duration);
+}
+
+if (typeof window !== "undefined") {
+  window.showToast = showToast;
+}
+
 /**
  * PlatformBridge
  * Unified cross-platform abstraction over Yandex Games, VK, RuStore, and Local Dev.
@@ -166,12 +186,20 @@ export class PlatformBridge {
     };
 
     const handleError = (err) => {
-      console.warn("[PlatformBridge] Rewarded ad error:", err);
+      console.warn("[PlatformBridge] Rewarded ad error (fallback activated):", err);
       this.isAdShowing = false;
       audio.setAdMuted(false);
       this.setFreeze(false);
       this.startGameplay();
+      if (!rewarded) {
+        rewarded = true;
+        if (typeof showToast === "function") {
+          showToast("Спонсорский бонус начислен!");
+        }
+        if (onRewarded) onRewarded();
+      }
       if (onError) onError(err);
+      if (onClose) onClose(true);
     };
 
     if (this.adapter) {

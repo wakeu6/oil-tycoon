@@ -20,7 +20,7 @@ export class VkAdapter extends BasePlatformAdapter {
 
     try {
       await window.vkBridge.send("VKWebAppInit");
-      const params = new URLSearchParams(window.location.search);
+      const params = new URLSearchParams(window.location?.search || "");
       this.lang = params.get("vk_language") || "ru";
       this.initStickyBanner();
       this.isReady = true;
@@ -57,15 +57,46 @@ export class VkAdapter extends BasePlatformAdapter {
 
     if (onOpen) onOpen();
 
-    window.vkBridge.send("VKWebAppShowNativeAds", { ad_format: "reward" })
+    // Request native rewarded video with interstitial fallback enabled
+    window.vkBridge.send("VKWebAppShowNativeAds", {
+      ad_format: "reward",
+      use_interstitial_fallback: true
+    })
       .then((data) => {
         if (data && data.result) {
           if (onRewarded) onRewarded();
+          if (onClose) onClose();
+        } else {
+          // If rewarded video returned false, attempt direct interstitial fallback
+          this.triggerFallbackAd(onRewarded, onClose, onError);
         }
-        if (onClose) onClose();
       })
       .catch((err) => {
-        if (onError) onError(err);
+        console.warn("[VkAdapter] Rewarded ad returned error (e.g. no video fill on desktop):", err);
+        this.triggerFallbackAd(onRewarded, onClose, onError);
+      });
+  }
+
+  triggerFallbackAd(onRewarded, onClose, onError) {
+    if (typeof window === "undefined" || !window.vkBridge) {
+      if (onRewarded) onRewarded();
+      if (onClose) onClose();
+      return;
+    }
+
+    window.vkBridge.send("VKWebAppShowNativeAds", { ad_format: "interstitial" })
+      .then((res) => {
+        if (onRewarded) onRewarded();
+        if (onClose) onClose();
+      })
+      .catch((fallbackErr) => {
+        console.warn("[VkAdapter] Interstitial fallback also had no fill/blocked:", fallbackErr);
+        // Player intended to watch ad: grant bonus with toast so user flow is never blocked
+        if (typeof window !== "undefined" && typeof window.showToast === "function") {
+          window.showToast("Спонсорский бонус начислен!");
+        }
+        if (onRewarded) onRewarded();
+        if (onClose) onClose();
       });
   }
 

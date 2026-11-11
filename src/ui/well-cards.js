@@ -84,6 +84,10 @@ export class WellCardsView {
       audio.playError();
     }
 
+    if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+      try { navigator.vibrate([40, 30, 40]); } catch (e) {}
+    }
+
     if (button) {
       if (button.classList?.remove) button.classList.remove("shake-error", "btn-insufficient-funds");
       if (typeof button.offsetWidth === "number") void button.offsetWidth;
@@ -91,6 +95,19 @@ export class WellCardsView {
       if (button.style) {
         button.style.animation = "btn-kowalski-shake 260ms cubic-bezier(0.23, 1, 0.32, 1)";
       }
+
+      // Add floating popover directly over button
+      if (typeof document !== "undefined" && document.createElement && !button.querySelector(".insufficient-funds-popover")) {
+        const popover = document.createElement("div");
+        popover.className = "insufficient-funds-popover";
+        popover.textContent = "⚠️ Недостаточно средств!";
+        button.style.position = "relative";
+        button.appendChild(popover);
+        setTimeout(() => {
+          if (popover.parentNode) popover.parentNode.removeChild(popover);
+        }, 1200);
+      }
+
       setTimeout(() => {
         if (button.classList?.remove) button.classList.remove("btn-insufficient-funds");
         if (button.style) button.style.animation = "";
@@ -164,7 +181,7 @@ export class WellCardsView {
         const def = CONFIG.WELLS.find(w => w.id === this.currentSheetWellId);
         if (!def) return;
 
-        const cost = !well.unlocked ? def.unlockCost : CONFIG.getUpgradeCost(def.baseCost, def.costMultiplier, well.level);
+        const cost = !well.unlocked ? def.unlockCost : (well.level === 0 ? 50000 : CONFIG.getUpgradeCost(def.baseCost, def.costMultiplier, well.level));
         const canAfford = (state.money || 0) >= cost;
 
         if (!canAfford) {
@@ -371,12 +388,17 @@ export class WellCardsView {
     this.setDockVisible(!open);
   }
 
+  closeAllModals() {
+    if (typeof document === "undefined") return;
+    document.querySelectorAll(".modal-backdrop:not(.hidden)").forEach(m => {
+      m.classList.add("hidden");
+    });
+  }
+
   openFacilitySheet() {
     if (!this.facilitySheet) return;
-    this.closeWellSheet();
-    this.closeCanteenSheet();
-    this.closeGarageSheet();
-    this.closeStructureSheet();
+    this.closeAllModals();
+    this.closeAllSheets(true);
     this.setDockVisible(false);
     this.facilitySheet.classList.remove("hidden", "sliding-down");
     this.updateFacilitySheet();
@@ -467,9 +489,8 @@ export class WellCardsView {
 
   openCanteenSheet() {
     if (!this.canteenSheet) return;
-    this.closeWellSheet();
-    this.closeFacilitySheet();
-    this.closeGarageSheet();
+    this.closeAllModals();
+    this.closeAllSheets(true);
     this.setDockVisible(false);
     this.canteenSheet.classList.remove("hidden", "sliding-down");
     this.updateCanteenSheet();
@@ -491,10 +512,8 @@ export class WellCardsView {
   
   openStructureSheet(type, customName, customBadge) {
     if (!this.structureSheet) return;
-    this.closeWellSheet();
-    this.closeFacilitySheet();
-    this.closeCanteenSheet();
-    this.closeGarageSheet();
+    this.closeAllModals();
+    this.closeAllSheets(true);
     this.setDockVisible(false);
 
     this.currentStructureType = type;
@@ -535,7 +554,8 @@ export class WellCardsView {
       gas_treatment: "Комплексная подготовка газа",
       dormitory: "Вахтовое общежитие",
       facility: "Газовый промысел",
-      canteen: "Столовая промысла"
+      canteen: "Столовая промысла",
+      rd_office: "Офис разработки месторождений"
     };
 
     const badges = {
@@ -547,8 +567,54 @@ export class WellCardsView {
       gas_treatment: "💧 НТС",
       dormitory: "🏠 КАМПУС",
       facility: "★ ПРОМЫСЕЛ ★",
-      canteen: "☕ СТОЛОВАЯ"
+      canteen: "☕ СТОЛОВАЯ",
+      rd_office: "🗺️ КАРТА"
     };
+
+    const roles = {
+      substation: "⚡ ЭНЕРГОСНАБЖЕНИЕ ПРОМЫСЛА",
+      garage: "🚗 АВТОТРАНСПОРТНАЯ БАЗА",
+      canteen: "🍲 БЫТ И ПИТАНИЕ ВАХТЫ",
+      dormitory: "🏠 ЖИЛОЙ ВАХТОВЫЙ КОМПЛЕКС",
+      mtr_yard: "📦 СКЛАД ОБОРУДОВАНИЯ И ТРУБ",
+      compressor: "💨 ДОЖИМНАЯ КОМПРЕССОРНАЯ",
+      gas_treatment: "💧 НИЗКОТЕМПЕРАТУРНАЯ СЕПАРАЦИЯ",
+      gatehouse: "🛡️ ОХРАНА И РЕЖИМНЫЙ КОНТРОЛЬ",
+      fence: "🔒 ЗАЩИТНЫЙ ПЕРИМЕТР",
+      facility: "🏭 ГОЛОВНЫЕ СООРУЖЕНИЯ ПРОМЫСЛА",
+      rd_office: "🗺️ ОФИС РАЗРАБОТКИ И ГЕОЛОГОРАЗВЕДКИ"
+    };
+
+    const quotes = {
+      substation: "«В -50°C без тока скважина встанет за 20 минут — парафин забьёт шлейф насмерть! КТПН питает греющие кабели труб и насосы.»",
+      garage: "«В тундре дорог нет — только зимники и снег. ТРЭКОЛы 6х6 на шинах низкого давления возят смены и аварийщиков в любую пургу!»",
+      canteen: "«Сытый вахтовик на Ямале — залог безаварийной добычи! Горячий борщ и чай поднимают выработку рабочих на лютом морозе.»",
+      dormitory: "«Тёплые жилые модули с сауной и сушилками для спецодежды. Полноценный отдых после 12-часовой смены на буровой.»",
+      mtr_yard: "«Здесь запас обсадных труб, фонтанных ёлок, фланцев и реагентов. Чем богаче склад — тем быстрее и дешевле разбуривать кусты!»",
+      compressor: "«Сердце газового промысла! Мощные турбокомпрессоры давят газ до 75–100 атм, чтобы протолкнуть его по магистральной трубе на экспорт.»",
+      gas_treatment: "«Осушка природного газа от влаги и конденсата. Без этого в трубе образуются ледяные пробки гидратов, способные разорвать металл!»",
+      gatehouse: "«Суровый ямальский ЧОП. Пьяных и посторонних не пускаем, въезд техники строго по путевым листам — защищает промысел от аварий и диверсий.»",
+      fence: "«Ограждение промысла с колючей лентой и датчиками движения. Защищает площадку от белых медведей, песцов и метелей.»",
+      facility: "«Центральный пункт сбора сырья: сепарация нефти, осушка газа на ТЭГ-колоннах и перекачка в магистральные трубопроводы.»",
+      rd_office: "«Штаб геологического моделирования и освоения новых лицензионных участков Ямала и арктического шельфа. Отсюда мы координируем расширение промысла на новые горизонты!»"
+    };
+
+    const roleEl = document.getElementById("sheet-structure-role");
+    const quoteEl = document.getElementById("sheet-structure-quote");
+    if (roleEl) roleEl.textContent = roles[type] || "ИНФРАСТРУКТУРА";
+    if (quoteEl) quoteEl.textContent = quotes[type] || "«Объект обеспечивает бесперебойную добычу и безопасность на промысле.»";
+
+    if (type === "rd_office") {
+      const btnTextEl = document.getElementById("sheet-structure-btn-text");
+      if (btnTextEl) btnTextEl.textContent = "🗺️ КАРТА МЕСТОРОЖДЕНИЙ";
+      if (this.sheetStructureBadge) this.sheetStructureBadge.textContent = "🗺️ КАРТА";
+      if (this.sheetStructureName) this.sheetStructureName.textContent = "Офис разработки месторождений";
+      if (this.sheetStructureCurrentLevel) this.sheetStructureCurrentLevel.textContent = "Действует";
+      if (this.sheetStructureBonusVal) this.sheetStructureBonusVal.textContent = "9 регионов";
+      if (this.sheetStructureCost) this.sheetStructureCost.textContent = "ОБЗОР ➔";
+      if (this.btnStructureUpgrade) this.btnStructureUpgrade.disabled = false;
+      return;
+    }
 
     const lvl = typeof state.getStructureLevel === "function" ? state.getStructureLevel(type) : 1;
     const cost = typeof state.getStructureUpgradeCost === "function" ? state.getStructureUpgradeCost(type) : 15000;
@@ -574,9 +640,8 @@ export class WellCardsView {
 
   openGarageSheet() {
     if (!this.garageSheet) return;
-    this.closeWellSheet();
-    this.closeFacilitySheet();
-    this.closeCanteenSheet();
+    this.closeAllModals();
+    this.closeAllSheets(true);
     this.setDockVisible(false);
     this.garageSheet.classList.remove("hidden", "sliding-down");
     this.updateGarageSheet();
@@ -637,20 +702,37 @@ export class WellCardsView {
     }
   }
 
-  closeAllSheets() {
+  closeAllSheets(immediate = true) {
+    if (immediate) {
+      const sheets = [this.sheet, this.facilitySheet, this.canteenSheet, this.garageSheet, this.structureSheet];
+      sheets.forEach(s => {
+        if (s) {
+          s.classList.remove("sliding-down");
+          s.classList.add("hidden");
+        }
+      });
+      if (this.purgeTimerInterval) {
+        clearInterval(this.purgeTimerInterval);
+        this.purgeTimerInterval = null;
+      }
+      this.setDockVisible(true);
+      state.emit("resetCameraFocus");
+      state.emit("wellSheetClosed");
+      return;
+    }
     this.closeWellSheet();
     this.closeFacilitySheet();
     this.closeCanteenSheet();
     this.closeGarageSheet();
+    this.closeStructureSheet();
     this.setDockVisible(true);
     state.emit("resetCameraFocus");
   }
 
   openWellSheet(wellId) {
     if (!this.sheet) return;
-    this.closeFacilitySheet();
-    this.closeCanteenSheet();
-    this.closeGarageSheet();
+    this.closeAllModals();
+    this.closeAllSheets(true);
     this.setDockVisible(false);
     this.currentSheetWellId = wellId || state.activeWellId || "well_1";
     this.sheet.classList.remove("hidden", "sliding-down");
@@ -671,6 +753,7 @@ export class WellCardsView {
     if (!this.sheet || this.sheet.classList.contains("hidden")) return;
     this.sheet.classList.add("sliding-down");
     state.emit("resetCameraFocus");
+    state.emit("wellSheetClosed");
     setTimeout(() => {
       if (this.sheet.classList.contains("sliding-down")) {
         this.sheet.classList.add("hidden");
@@ -686,19 +769,25 @@ export class WellCardsView {
     const well = state.wells[this.currentSheetWellId];
     if (!def || !well) return;
 
-    const padWellsCount = typeof state.getWellsCountOnPad === "function" ? state.getWellsCountOnPad(this.currentSheetWellId) : 2;
+    const padWellsCount = typeof state.getWellsCountOnPad === "function" ? state.getWellsCountOnPad(this.currentSheetWellId) : (well.level > 0 ? 2 : 0);
     if (this.sheetBadge) {
-      this.sheetBadge.textContent = well.unlocked ? `КУСТ • ${padWellsCount} СКВАЖИНЫ` : "ЗАКРЫТЫЙ КУСТ";
+      if (!well.unlocked) {
+        this.sheetBadge.textContent = "ЗАКРЫТЫЙ КУСТ";
+      } else if (well.level === 0) {
+        this.sheetBadge.textContent = "НОВАЯ ПЛОЩАДКА • 0 СКВАЖИН";
+      } else {
+        this.sheetBadge.textContent = `КУСТ • ${padWellsCount} СКВАЖИНЫ`;
+      }
     }
 
     if (this.sheetName) {
-      const lvlStr = well.unlocked ? `(Ур. ${well.level})` : `(Закрыт)`;
+      const lvlStr = !well.unlocked ? `(Закрыт)` : (well.level === 0 ? `(Не разбурена)` : `(Ур. ${well.level})`);
       this.sheetName.textContent = `${def.name || "Кустовая площадка"} ${lvlStr}`;
     }
 
     const stimMult = typeof state.getWellStimulationMultiplier === "function" ? state.getWellStimulationMultiplier(well.id) : 1.0;
-    const curIncome = well.unlocked ? (CONFIG.getWellIncome(def.baseIncome, well.level) * stimMult) : 0;
-    const nextIncome = CONFIG.getWellIncome(def.baseIncome, (well.level || 0) + 1) * stimMult;
+    const curIncome = (well.unlocked && well.level > 0) ? (CONFIG.getWellIncome(def.baseIncome, well.level) * stimMult) : 0;
+    const nextIncome = (well.level === 0) ? (CONFIG.getWellIncome(def.baseIncome, 1) * stimMult) : (CONFIG.getWellIncome(def.baseIncome, (well.level || 0) + 1) * stimMult);
 
     if (this.sheetCurDebit) {
       this.sheetCurDebit.textContent = `+${HudView.formatNumber(curIncome)}/сек`;
@@ -708,7 +797,7 @@ export class WellCardsView {
       this.sheetNextDebit.textContent = `+${HudView.formatNumber(nextIncome)}/сек`;
     }
 
-    const cost = !well.unlocked ? def.unlockCost : CONFIG.getUpgradeCost(def.baseCost, def.costMultiplier, well.level);
+    const cost = !well.unlocked ? def.unlockCost : (well.level === 0 ? 50000 : CONFIG.getUpgradeCost(def.baseCost, def.costMultiplier, well.level));
     const canAfford = (state.money || 0) >= cost;
 
     if (this.sheetUpgradeCost) {
@@ -718,6 +807,8 @@ export class WellCardsView {
     if (this.sheetActionText) {
       if (!well.unlocked) {
         this.sheetActionText.textContent = "РАЗБУРИТЬ КУСТ";
+      } else if (well.level === 0) {
+        this.sheetActionText.textContent = "🚜 РАЗБУРИТЬ СКВАЖИНУ";
       } else if (padWellsCount < 5) {
         this.sheetActionText.textContent = `+1 СКВАЖИНА НА КУСТЕ (№${padWellsCount + 1})`;
       } else {
@@ -1077,6 +1168,12 @@ export class WellCardsView {
     if (this.btnStructureUpgrade) {
       this.btnStructureUpgrade.addEventListener("click", () => {
         if (!this.currentStructureType) return;
+        if (this.currentStructureType === "rd_office") {
+          this.closeStructureSheet();
+          state.emit("openWorldMap");
+          state.progressQuest("world_map", 1);
+          return;
+        }
         if (state.upgradeStructure(this.currentStructureType)) {
           this.updateStructureSheet();
         } else {
@@ -1101,8 +1198,8 @@ export class WellCardsView {
       this.updateGarageSheet();
     });
 
-    state.on("closeAllBottomSheets", () => {
-      this.closeAllSheets();
+    state.on("closeAllBottomSheets", (data) => {
+      this.closeAllSheets(data?.immediate ?? true);
     });
 
     state.on("wellMasteryUpdated", () => {

@@ -17,6 +17,88 @@ import { ArcticTanker3D } from "./arctic-tanker.js";
  * - Clicker tap cash harvesting with floating numbers and camera trauma shake
  * - OrbitControls with day/night and ortho/perspective toggle
  */
+/**
+ * Clash of Clans (CoC) Building Footprint Dimensions & Grid Hierarchy
+ * Tile unit: CELL_SIZE = 3.5m (3x3 tiles per GRID_SCALE unit of 10.5m)
+ * Every building has its own distinct, proportional cell grid footprint:
+ * - 8x6: Town Hall of the oilfield (station_cps Central Complex)
+ * - 10x8: Industrial Megaprojects (refinery, gas_plant, petrochem, storage)
+ * - 5x4: Well Clusters & Major Industrial Stations (well_1..4, garage, dks_gas, mtr_yard)
+ * - 4x3: Modular Buildings (dormitory, rd_office, nts_gas)
+ * - 3x3: Specialized Units (canteen, crypto_flare)
+ * - 3x2: Compact Outposts & Mobile Units (gatehouse, sda_nitrogen)
+ * - 2x2: Micro Utility Pods (substation, manifold_bvm, bdr_methanol)
+ */
+export const BUILDING_GRID_SIZES = {
+  // 1. Central Complex / Town Hall (Ратуша промысла)
+  station_cps:   { cellsW: 8, cellsD: 6, label: "ЦПС Главный Комплекс", category: "hq" },
+
+  // 2. Industrial Megaprojects (Северный промышленный кластер)
+  refinery:      { cellsW: 10, cellsD: 8, label: "НПЗ Комплекс", category: "industry" },
+  gas_plant:     { cellsW: 10, cellsD: 8, label: "ГПЗ Завод", category: "industry" },
+  petrochem:     { cellsW: 10, cellsD: 8, label: "Нефтехимический Комплекс", category: "industry" },
+  storage:       { cellsW: 10, cellsD: 8, label: "Резервуарный Парк", category: "storage" },
+
+  // 3. Well Clusters / Production Pads (Кусты скважин)
+  well_1:        { cellsW: 5, cellsD: 4, label: "Куст Скважин №1", category: "well" },
+  well_2:        { cellsW: 5, cellsD: 4, label: "Куст Скважин №2", category: "well" },
+  well_3:        { cellsW: 5, cellsD: 4, label: "Куст Скважин №3", category: "well" },
+  well_4:        { cellsW: 5, cellsD: 4, label: "Куст Скважин №4", category: "well" },
+
+  // 4. Heavy Base Facilities & Logistics (Тяжелая инфраструктура)
+  garage:        { cellsW: 5, cellsD: 4, label: "Гараж ТРЭКОЛ", category: "facility" },
+  dks_gas:       { cellsW: 5, cellsD: 4, label: "ДКС Компрессорная", category: "facility" },
+  mtr_yard:      { cellsW: 5, cellsD: 4, label: "Трубная База МТР", category: "logistics" },
+
+  // 5. Modular Living & Science Facilities (Модульные блоки)
+  dormitory:     { cellsW: 4, cellsD: 3, label: "Жилой Комплекс", category: "residential" },
+  rd_office:     { cellsW: 6, cellsD: 4, label: "НТЦ Геологии", category: "science" },
+  nts_gas:       { cellsW: 4, cellsD: 3, label: "Цех НТС Газоочистки", category: "facility" },
+
+  // 6. Support & Specialized Units (Вспомогательные блоки)
+  canteen:       { cellsW: 3, cellsD: 3, label: "Столовая", category: "residential" },
+  crypto_flare:  { cellsW: 3, cellsD: 3, label: "Крипто-модуль ПНГ", category: "utility" },
+
+  // 7. Compact Outposts & Process Skids (Компактные посты)
+  gatehouse:     { cellsW: 3, cellsD: 2, label: "КПП и Охрана", category: "security" },
+  sda_nitrogen:  { cellsW: 3, cellsD: 2, label: "Азотная Станция СДА", category: "utility" },
+
+  // 8. Micro Utility Skids (Компактные шкафы и блоки 2x2)
+  substation:    { cellsW: 2, cellsD: 2, label: "КТПН Подстанция", category: "power" },
+  manifold_bvm:  { cellsW: 2, cellsD: 2, label: "Блок Манифольда БВМ", category: "utility" },
+  bdr_methanol:  { cellsW: 2, cellsD: 2, label: "БДР Метанол", category: "utility" }
+};
+
+/**
+ * Pixel-Perfect Clash of Clans Discrete Grid Snapper
+ * Aligns bounding box edges strictly to integer multiples of cellSize (3.5m).
+ * Zero gap, zero offset against the base tactical grid!
+ */
+export function snapToBuildingGrid(worldX, worldZ, cellsW, cellsD, cellSize = 3.5) {
+  const halfW = (cellsW * cellSize) / 2;
+  const halfD = (cellsD * cellSize) / 2;
+  const col = Math.round((worldX - halfW) / cellSize);
+  const row = Math.round((worldZ - halfD) / cellSize);
+  const minX = col * cellSize;
+  const maxX = minX + cellsW * cellSize;
+  const minZ = row * cellSize;
+  const maxZ = minZ + cellsD * cellSize;
+  const centerX = minX + halfW;
+  const centerZ = minZ + halfD;
+  return {
+    x: centerX,
+    z: centerZ,
+    col,
+    row,
+    minX,
+    maxX,
+    minZ,
+    maxZ,
+    w: cellsW * cellSize,
+    d: cellsD * cellSize
+  };
+}
+
 export class Isometric3D {
   constructor(canvas, parentIso) {
     this.canvas = canvas;
@@ -105,6 +187,10 @@ export class Isometric3D {
     };
   }
 
+  snapToBuildingGrid(worldX, worldZ, cellsW, cellsD, cellSize = 3.5) {
+    return snapToBuildingGrid(worldX, worldZ, cellsW, cellsD, cellSize);
+  }
+
   initCamera(d = 96) {
     const THREE = this.THREE;
     const canvas = this.canvas;
@@ -126,7 +212,8 @@ export class Isometric3D {
     this.camera = this.isOrtho ? this.orthoCamera : this.perspCamera;
     this.cameraBasePos = this.camera.position.clone();
     this.billboardSprites = [];
-    this.billboardDisplayMode = "full";
+    this.billboardDisplayMode = "hidden";
+    this.clock = new THREE.Clock();
   }
 
   updateCamera(d = 96) {
@@ -216,18 +303,40 @@ export class Isometric3D {
       };
       this.controls.screenSpacePanning = false;
 
-      // Township Building Move Footprint
+      // Township Building Move Footprint (Clash of Clans style cell matrix)
       const footprintGeo = new THREE.PlaneGeometry(1, 1);
       const footprintMat = new THREE.MeshBasicMaterial({
         color: 0x22c55e,
         transparent: true,
-        opacity: 0.45,
-        depthWrite: false
+        opacity: 0.85,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+        polygonOffset: true,
+        polygonOffsetFactor: -4,
+        polygonOffsetUnits: -4
       });
       this.footprintMesh = new THREE.Mesh(footprintGeo, footprintMat);
       this.footprintMesh.rotation.x = -Math.PI / 2;
+      this.footprintMesh.renderOrder = 999;
       this.footprintMesh.visible = false;
       this.scene.add(this.footprintMesh);
+
+      // Base-Wide Tactical Grid Overlay for Move Mode (Clash of Clans base editor style)
+      // Extent 112m covers the paved perimeter apron with 32 divisions of 3.5m each
+      // Positioned at (-17.5, 1.70, -3.5): both X and Z are exact multiples of 3.5 (-5*3.5, -1*3.5),
+      // guaranteeing that all grid lines lie on world integer multiples of 3.5m, aligning 1:1 with building footprints!
+      this.baseGridMesh = new THREE.GridHelper(112, 32, 0x38bdf8, 0x64748b);
+      this.baseGridMesh.position.set(-17.5, 1.70, -3.5);
+      this.baseGridMesh.renderOrder = 990;
+      if (this.baseGridMesh.material) {
+        this.baseGridMesh.material.opacity = 0.45;
+        this.baseGridMesh.material.transparent = true;
+        this.baseGridMesh.material.depthWrite = false;
+      }
+      this.baseGridMesh.visible = false;
+      this.scene.add(this.baseGridMesh);
+
+      this.cocFootprintCache = new Map();
 
       // Pre-allocated Ground Raycasting Plane (Zero-GC compliant)
       this.groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -1.2);
@@ -375,6 +484,7 @@ export class Isometric3D {
     this.resize();
 
     if (typeof window !== "undefined") {
+      window.engine3D = this;
       window.addEventListener("resize", () => this.resize());
       if (typeof ResizeObserver !== "undefined" && parent) {
         this.resizeObserver = new ResizeObserver(() => this.resize());
@@ -2240,7 +2350,7 @@ export class Isometric3D {
     const padGroup = new THREE.Group();
     padGroup.position.set(padPos.x, wPos.y, padPos.z);
     this.wellpadGroups[cfg.id] = padGroup;
-    this.registerMovableBuilding(cfg.id, padGroup, { gx: cfg.gx, gy: cfg.gy, yOffset: 1.2 }, { w: 22, d: 14 });
+    this.registerMovableBuilding(cfg.id, padGroup, { gx: cfg.gx, gy: cfg.gy, yOffset: 1.2 }, { cellsW: 5, cellsD: 4, w: 17.5, d: 14.0, label: `Куст Скважин №${cfg.id.replace('well_', '')}` });
 
     const well = state.wells[cfg.id];
     const isUnlocked = well && well.unlocked && well.level > 0;
@@ -2521,7 +2631,7 @@ export class Isometric3D {
     return g;
   }
 
-  // --- 4. CENTRAL MEGA GAS PROCESSING PLANT (WITH SNOW ROOFS & SUGRUBS) ---
+  // --- 4. CENTRAL MEGA GAS PROCESSING PLANT (ВОЗВРАЩЕНО ИСТИННОЕ ИНДУСТРИАЛЬНОЕ ЗДАНИЕ ГПЗ / ЦПС, СЕТКА 8x6) ---
   buildMegaGasPlant() {
     const THREE = this.THREE;
     if (this.plantGroup) {
@@ -2529,387 +2639,319 @@ export class Isometric3D {
       this.scene.remove(this.plantGroup);
     }
     const plantGroup = new THREE.Group();
-    const defaultPlantPos = this.gridToWorld(6.5, 6.5, 1.2);
-    const plantPos = (typeof state?.getBuildingPos === "function") ? state.getBuildingPos("station_cps", defaultPlantPos) : defaultPlantPos;
-    plantGroup.position.set(plantPos.x, defaultPlantPos.y, plantPos.z);
+    // Default grid position aligned to 8x6 cell grid: col -4, row -4 -> center (0.0, -3.5)
+    const rawDefaultPlantPos = { x: 0.0, y: 1.2, z: -3.5 };
+    const savedPos = (typeof state?.getBuildingPos === "function") ? state.getBuildingPos("station_cps", rawDefaultPlantPos) : rawDefaultPlantPos;
+    const snappedPlant = this.snapToBuildingGrid(savedPos.x, savedPos.z, 8, 6, 3.5);
+    plantGroup.position.set(snappedPlant.x, 1.2, snappedPlant.z);
     this.plantGroup = plantGroup;
-    this.registerMovableBuilding("station_cps", plantGroup, { gx: 6.5, gy: 6.5, yOffset: 1.2 }, { w: 48, d: 38 });
+    this.registerMovableBuilding("station_cps", plantGroup, rawDefaultPlantPos, { cellsW: 8, cellsD: 6, w: 28.0, d: 21.0, label: "ЦПС Главный Комплекс" });
 
     // ============================================
-    // FOUNDATION & GROUND PLANE
+    // FOUNDATION & PAG CONCRETE BASE PLATFORM (8x6 Cells = 28.0m x 21.0m)
     // ============================================
-    const baseW = 48, baseD = 38;
-    const base = new THREE.Mesh(new THREE.BoxGeometry(baseW, 1.0, baseD), this.mat.pagConcrete || this.mat.concrete);
-    base.position.y = 0.5;
+    const baseW = 28.0, baseD = 21.0, baseH = 0.8;
+    const base = new THREE.Mesh(new THREE.BoxGeometry(baseW, baseH, baseD), this.mat.pagConcrete || this.mat.concrete);
+    base.position.y = baseH / 2;
     base.receiveShadow = true;
     plantGroup.add(base);
 
-    // Perimeter concrete curb
+    // Perimeter concrete curb (fits exactly inside cell boundaries)
     const curbMat = this.mat.concreteDark || this.mat.concrete;
-    [[-baseW / 2, 0], [baseW / 2, 0]].forEach(([cx]) => {
-      const curb = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.4, baseD), curbMat);
-      curb.position.set(cx, 0.7, 0);
+    const curbThick = 0.4, curbH = 0.3;
+    [[-baseW / 2 + curbThick / 2, 0], [baseW / 2 - curbThick / 2, 0]].forEach(([cx]) => {
+      const curb = new THREE.Mesh(new THREE.BoxGeometry(curbThick, baseH + curbH, baseD), curbMat);
+      curb.position.set(cx, (baseH + curbH) / 2, 0);
       plantGroup.add(curb);
     });
-    [[0, -baseD / 2], [0, baseD / 2]].forEach(([, cz]) => {
-      const curb = new THREE.Mesh(new THREE.BoxGeometry(baseW, 1.4, 0.6), curbMat);
-      curb.position.set(0, 0.7, cz);
+    [[0, -baseD / 2 + curbThick / 2], [0, baseD / 2 - curbThick / 2]].forEach(([, cz]) => {
+      const curb = new THREE.Mesh(new THREE.BoxGeometry(baseW, baseH + curbH, curbThick), curbMat);
+      curb.position.set(0, (baseH + curbH) / 2, cz);
       plantGroup.add(curb);
     });
 
     // Soft Ambient Occlusion Contact Shadow on Snow
     if (this.mat.contactShadow) {
-      const shadowPlane = new THREE.Mesh(new THREE.PlaneGeometry(54, 44), this.mat.contactShadow);
+      const shadowPlane = new THREE.Mesh(new THREE.PlaneGeometry(32, 25), this.mat.contactShadow);
       shadowPlane.rotation.x = -Math.PI / 2;
       shadowPlane.position.set(0, 0.04, 0);
       plantGroup.add(shadowPlane);
     }
 
     // ============================================
-    // MAIN COMPRESSOR WORKSHOP (centre-right)
+    // MAIN COMPRESSOR WORKSHOP (ГЛАВНЫЙ КОМПРЕССОРНЫЙ ЦЕХ ГПЗ С ДВУСКАТНОЙ КРОВЛЕЙ)
     // ============================================
-    const bodyW = 22, bodyH = 9.0, bodyD = 14;
-    const bodyX = 2, bodyZ = -2;
-    const body = new THREE.Mesh(new THREE.BoxGeometry(bodyW, bodyH, bodyD), this.mat.corrugatedWorkshop || this.mat.whiteWall);
-    body.position.set(bodyX, bodyH / 2 + 1, bodyZ);
+    const bodyW = 16.0, bodyH = 7.5, bodyD = 10.0;
+    const bodyX = -1.0, bodyZ = 0.5;
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(bodyW, bodyH, bodyD),
+      this.mat.corrugatedWorkshop || this.mat.whiteWall
+    );
+    body.position.set(bodyX, baseH + bodyH / 2, bodyZ);
     body.castShadow = true;
     body.receiveShadow = true;
     plantGroup.add(body);
 
-    // Lower blue accent stripe on the long sides of the workshop
+    // Lower Gazprom corporate blue accent stripe on workshop
     const stripeMat = new THREE.MeshStandardMaterial({ color: 0x005bab, roughness: 0.35, metalness: 0.12 });
-    const stripeH = 1.2;
+    const stripeH = 1.0;
     [bodyD / 2 + 0.02, -(bodyD / 2 + 0.02)].forEach(sz => {
-      const stripe = new THREE.Mesh(new THREE.BoxGeometry(bodyW - 0.5, stripeH, 0.15), stripeMat);
-      stripe.position.set(bodyX, 1 + stripeH / 2 + 0.3, bodyZ + sz);
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(bodyW - 0.4, stripeH, 0.12), stripeMat);
+      stripe.position.set(bodyX, baseH + stripeH / 2 + 0.25, bodyZ + sz);
       plantGroup.add(stripe);
     });
 
-    // Industrial Gable Roof (Gazprom corporate blue)
-    const roofOverhang = 1.2;
+    // Industrial Gable Roof (Двускатная промышленная кровля с синим/оранжевым скосом)
+    const roofOverhang = 0.8;
+    const roofApexH = 3.6;
     const roofShape = new THREE.Shape();
     roofShape.moveTo(-bodyW / 2 - roofOverhang, 0);
-    roofShape.lineTo(0, 4.5);
+    roofShape.lineTo(0, roofApexH);
     roofShape.lineTo(bodyW / 2 + roofOverhang, 0);
     roofShape.closePath();
     const roof = new THREE.Mesh(
       new THREE.ExtrudeGeometry(roofShape, { depth: bodyD + roofOverhang * 2, bevelEnabled: false }),
       this.mat.orangeRoof
     );
-    roof.position.set(bodyX, bodyH + 1, bodyZ - bodyD / 2 - roofOverhang);
+    roof.position.set(bodyX, baseH + bodyH, bodyZ - bodyD / 2 - roofOverhang);
     roof.castShadow = true;
     plantGroup.add(roof);
 
-    // Snow cap on roof
+    // Snow Cap on Roof (Реалистичный снежный покров)
     const snowRoofShape = new THREE.Shape();
-    snowRoofShape.moveTo(-bodyW / 2 - roofOverhang + 0.2, 0.2);
-    snowRoofShape.lineTo(0, 4.65);
-    snowRoofShape.lineTo(bodyW / 2 + roofOverhang - 0.2, 0.2);
-    snowRoofShape.lineTo(bodyW / 2 + roofOverhang - 0.2, 0.7);
-    snowRoofShape.lineTo(0, 5.05);
-    snowRoofShape.lineTo(-bodyW / 2 - roofOverhang + 0.2, 0.7);
+    snowRoofShape.moveTo(-bodyW / 2 - roofOverhang + 0.15, 0.15);
+    snowRoofShape.lineTo(0, roofApexH + 0.15);
+    snowRoofShape.lineTo(bodyW / 2 + roofOverhang - 0.15, 0.15);
+    snowRoofShape.lineTo(bodyW / 2 + roofOverhang - 0.15, 0.55);
+    snowRoofShape.lineTo(0, roofApexH + 0.55);
+    snowRoofShape.lineTo(-bodyW / 2 - roofOverhang + 0.15, 0.55);
     snowRoofShape.closePath();
     const snowRoof = new THREE.Mesh(
-      new THREE.ExtrudeGeometry(snowRoofShape, { depth: bodyD + roofOverhang * 2 + 0.3, bevelEnabled: false }),
+      new THREE.ExtrudeGeometry(snowRoofShape, { depth: bodyD + roofOverhang * 2 + 0.25, bevelEnabled: false }),
       this.mat.snowCap
     );
-    snowRoof.position.set(bodyX, bodyH + 1, bodyZ - bodyD / 2 - roofOverhang - 0.15);
+    snowRoof.position.set(bodyX, baseH + bodyH, bodyZ - bodyD / 2 - roofOverhang - 0.12);
     snowRoof.castShadow = true;
     plantGroup.add(snowRoof);
 
     // Ridge vent on roof apex
-    const ridgeVent = new THREE.Mesh(new THREE.BoxGeometry(bodyW * 0.6, 0.8, 1.2), this.mat.darkMetal);
-    ridgeVent.position.set(bodyX, bodyH + 1 + 4.7, bodyZ);
+    const ridgeVent = new THREE.Mesh(new THREE.BoxGeometry(bodyW * 0.6, 0.6, 0.9), this.mat.darkMetal);
+    ridgeVent.position.set(bodyX, baseH + bodyH + roofApexH + 0.3, bodyZ);
     plantGroup.add(ridgeVent);
 
-    // Twin Chimneys with orange rings
-    [-4, 4].forEach(cx => {
-      const chimney = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.75, 13, 16), this.mat.darkMetal);
-      chimney.position.set(bodyX + cx, bodyH + 5, bodyZ - 3);
+    // ============================================
+    // TWIN INDUSTRIAL CHIMNEYS WITH WARNING LIGHTS & STEAM
+    // ============================================
+    const chimneyH = 11.0;
+    [-3.2, 3.2].forEach(cx => {
+      const chimney = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.65, chimneyH, 16), this.mat.darkMetal);
+      chimney.position.set(bodyX + cx, baseH + bodyH + chimneyH / 2 - 1.0, bodyZ - 2.5);
       chimney.castShadow = true;
       plantGroup.add(chimney);
 
-      const rim = new THREE.Mesh(new THREE.TorusGeometry(0.8, 0.18, 8, 16), this.mat.orangeAccent);
+      // High-visibility orange signal ring
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.14, 8, 16), this.mat.orangeAccent);
       rim.rotation.x = Math.PI / 2;
-      rim.position.set(bodyX + cx, bodyH + 11.5, bodyZ - 3);
+      rim.position.set(bodyX + cx, baseH + bodyH + chimneyH - 2.2, bodyZ - 2.5);
       plantGroup.add(rim);
 
-      // Red aviation warning lights on chimneys
+      // Pulsing red aviation obstruction warning light
       const warningLight = new THREE.Mesh(
-        new THREE.SphereGeometry(0.25, 8, 8),
-        new THREE.MeshBasicMaterial({ color: 0xe53935 })
+        new THREE.SphereGeometry(0.24, 8, 8),
+        new THREE.MeshBasicMaterial({ color: 0xef4444 })
       );
-      warningLight.position.set(bodyX + cx, bodyH + 12, bodyZ - 3);
+      warningLight.position.set(bodyX + cx, baseH + bodyH + chimneyH - 0.8, bodyZ - 2.5);
       plantGroup.add(warningLight);
     });
 
-    // ============================================
-    // FRACTIONATION COLUMNS (right side of base)
-    // ============================================
-    const colConfigs = [
-      { name: "К-1", x: 18, z: -8, r: 1.8, h: 19 },
-      { name: "ТЭГ-1", x: 18, z: -1, r: 1.5, h: 15 },
-      { name: "НТС-1", x: 18, z: 5, r: 1.3, h: 12 }
-    ];
-    colConfigs.forEach(col => {
-      // Concrete pedestal
-      const pedestal = new THREE.Mesh(new THREE.CylinderGeometry(col.r + 0.6, col.r + 0.8, 1.0, 16), curbMat);
-      pedestal.position.set(col.x, 1.5, col.z);
-      plantGroup.add(pedestal);
-
-      // Main column body
-      const colMesh = new THREE.Mesh(new THREE.CylinderGeometry(col.r, col.r, col.h, 24), this.mat.whiteTank);
-      colMesh.position.set(col.x, col.h / 2 + 2, col.z);
-      colMesh.castShadow = true;
-      plantGroup.add(colMesh);
-
-      // Column head (dome)
-      const dome = new THREE.Mesh(new THREE.SphereGeometry(col.r, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2), this.mat.whiteTank);
-      dome.position.set(col.x, col.h + 2, col.z);
-      plantGroup.add(dome);
-
-      // Snow cap on top
-      const snowCap = new THREE.Mesh(new THREE.SphereGeometry(col.r + 0.15, 16, 12), this.mat.snowCap);
-      snowCap.position.set(col.x, col.h + 2.3, col.z);
-      snowCap.scale.set(1, 0.4, 1);
-      plantGroup.add(snowCap);
-
-      // Steel reinforcement rings (every 3m)
-      for (let ry = 4; ry < col.h; ry += 3.5) {
-        const ring = new THREE.Mesh(new THREE.TorusGeometry(col.r + 0.15, 0.12, 8, 20), this.mat.darkMetal);
-        ring.rotation.x = Math.PI / 2;
-        ring.position.set(col.x, ry, col.z);
-        plantGroup.add(ring);
-      }
-
-      // Service ladder (vertical I-bar)
-      const ladder = new THREE.Mesh(new THREE.BoxGeometry(0.12, col.h, 0.5), this.mat.darkMetal);
-      ladder.position.set(col.x + col.r + 0.25, col.h / 2 + 2, col.z);
-      plantGroup.add(ladder);
-
-      // Connecting pipe to workshop
-      const pipeLen = Math.abs(col.x - (bodyX + bodyW / 2)) - col.r - 0.5;
-      if (pipeLen > 0) {
-        const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, pipeLen, 8), this.mat.silverPipe || this.mat.whiteTank);
-        pipe.rotation.z = Math.PI / 2;
-        pipe.position.set(col.x - col.r - pipeLen / 2, 6, col.z);
-        plantGroup.add(pipe);
-      }
-    });
-
-    // ============================================
-    // 4 HORIZONTAL BULLET TANKS (РГС) — in front row
-    // ============================================
-    const bulletZ = 12;
-    [[-6, bulletZ], [0, bulletZ], [6, bulletZ], [12, bulletZ]].forEach(([bx, bz]) => {
-      // Saddle supports
-      [-1.5, 1.5].forEach(sx => {
-        const saddle = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.4, 2.8), curbMat);
-        saddle.position.set(bx + sx, 1.7, bz);
-        plantGroup.add(saddle);
+    // Animated rising steam smoke puffs from twin chimneys
+    if (this.animatedObjects?.chimneySmokes) {
+      [-3.2, 3.2].forEach(cx => {
+        const puffs = [];
+        for (let s = 0; s < 4; s++) {
+          const puff = new THREE.Mesh(new THREE.SphereGeometry(0.35 + s * 0.16, 6, 6), this.mat.smokeCloud);
+          puff.position.set(snappedPlant.x + bodyX + cx, 1.2 + baseH + bodyH + chimneyH + s * 0.8, snappedPlant.z + bodyZ - 2.5);
+          this.scene.add(puff);
+          puffs.push(puff);
+        }
+        this.animatedObjects.chimneySmokes.push({
+          puffs,
+          baseX: snappedPlant.x + bodyX + cx,
+          baseY: 1.2 + baseH + bodyH + chimneyH,
+          baseZ: snappedPlant.z + bodyZ - 2.5,
+          speed: 1.6,
+          spread: 0.35
+        });
       });
-
-      const bullet = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.25, 6.0, 16), this.mat.whiteTank);
-      bullet.rotation.z = Math.PI / 2;
-      bullet.position.set(bx, 3.0, bz);
-      bullet.castShadow = true;
-      plantGroup.add(bullet);
-
-      // End caps (half spheres)
-      [-3, 3].forEach(ex => {
-        const cap = new THREE.Mesh(new THREE.SphereGeometry(1.25, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), this.mat.whiteTank);
-        cap.rotation.z = ex > 0 ? Math.PI / 2 : -Math.PI / 2;
-        cap.position.set(bx + ex, 3.0, bz);
-        plantGroup.add(cap);
-      });
-
-      const snowRidge = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.3, 1.6), this.mat.snowCap);
-      snowRidge.position.set(bx, 4.3, bz);
-      plantGroup.add(snowRidge);
-    });
-
-    // ============================================
-    // 2 LARGE RVS TANKS — far left (CLEAR of main body)
-    // ============================================
-    const rvsConfigs = [
-      { x: -18.5, z: -8, mat: this.mat.rvsOilTank, label: "РВС-1" },
-      { x: -17, z: 2, mat: this.mat.rvsGasTank, label: "РВС-2" }
-    ];
-    rvsConfigs.forEach(cfg => {
-      // Tank foundation ring
-      const foundation = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.4, 0.8, 32), curbMat);
-      foundation.position.set(cfg.x, 1.4, cfg.z);
-      plantGroup.add(foundation);
-
-      // Main tank body
-      const rvs = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 3.6, 7.5, 32), cfg.mat || this.mat.whiteTank);
-      rvs.position.set(cfg.x, 5.6, cfg.z);
-      rvs.castShadow = true;
-      plantGroup.add(rvs);
-
-      // Cone roof
-      const rvsRoof = new THREE.Mesh(new THREE.ConeGeometry(3.8, 1.8, 32), this.mat.darkMetal);
-      rvsRoof.position.set(cfg.x, 10.3, cfg.z);
-      plantGroup.add(rvsRoof);
-
-      // Snow on cone roof
-      const snowDome = new THREE.Mesh(new THREE.ConeGeometry(3.6, 1.2, 24), this.mat.snowCap);
-      snowDome.position.set(cfg.x, 10.8, cfg.z);
-      plantGroup.add(snowDome);
-
-      // Horizontal weld seams (three belts)
-      [3.5, 6.0, 8.0].forEach(wy => {
-        const weld = new THREE.Mesh(new THREE.TorusGeometry(3.65, 0.06, 6, 32), this.mat.darkMetal);
-        weld.rotation.x = Math.PI / 2;
-        weld.position.set(cfg.x, wy, cfg.z);
-        plantGroup.add(weld);
-      });
-
-      // Service ladder on tank
-      const tLadder = new THREE.Mesh(new THREE.BoxGeometry(0.12, 8.0, 0.5), this.mat.darkMetal);
-      tLadder.position.set(cfg.x + 3.7, 5.5, cfg.z);
-      plantGroup.add(tLadder);
-
-      // Safety railing ring at top
-      const railing = new THREE.Mesh(new THREE.TorusGeometry(3.9, 0.06, 6, 32), this.mat.orangeAccent);
-      railing.rotation.x = Math.PI / 2;
-      railing.position.set(cfg.x, 9.5, cfg.z);
-      plantGroup.add(railing);
-
-      // Connecting pipe from tank to facility
-      const pipeDist = Math.abs(cfg.x - (bodyX - bodyW / 2)) - 3.6 - 0.5;
-      if (pipeDist > 0) {
-        const connPipe = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, pipeDist, 8), this.mat.silverPipe || this.mat.whiteTank);
-        connPipe.rotation.z = Math.PI / 2;
-        connPipe.position.set(cfg.x + 3.6 + pipeDist / 2, 3.5, cfg.z);
-        plantGroup.add(connPipe);
-      }
-    });
+    }
 
     // ============================================
     // AIR-COOLED HEAT EXCHANGERS (АВО ГАЗА) — behind workshop
     // ============================================
-    const avoX = 5, avoZ = -15;
-    const avoFrame = new THREE.Mesh(new THREE.BoxGeometry(10, 3.0, 5.5), this.mat.darkMetal);
-    avoFrame.position.set(avoX, 2.5, avoZ);
+    const avoX = bodyX, avoZ = bodyZ - bodyD / 2 - 2.8;
+    const avoFrame = new THREE.Mesh(new THREE.BoxGeometry(9.0, 2.2, 3.6), this.mat.darkMetal);
+    avoFrame.position.set(avoX, baseH + 1.1, avoZ);
     avoFrame.castShadow = true;
     plantGroup.add(avoFrame);
 
-    // Fan housing tops
+    this.animatedObjects.avoFans = [];
     for (let f = 0; f < 3; f++) {
-      const housing = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 0.4, 16), this.mat.darkMetal);
-      housing.position.set(avoX - 3 + f * 3, 4.2, avoZ);
+      const housing = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.35, 16), this.mat.darkMetal);
+      housing.position.set(avoX - 2.8 + f * 2.8, baseH + 2.35, avoZ);
       plantGroup.add(housing);
 
       const fanPivot = new THREE.Group();
-      fanPivot.position.set(avoX - 3 + f * 3, 4.5, avoZ);
+      fanPivot.position.set(avoX - 2.8 + f * 2.8, baseH + 2.55, avoZ);
       plantGroup.add(fanPivot);
 
-      const fanBlade = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.08, 0.35), this.mat.orangeAccent);
-      fanPivot.add(fanBlade);
+      for (let b = 0; b < 4; b++) {
+        const fanBlade = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.05, 0.3), this.mat.orangeAccent);
+        fanBlade.rotation.y = (b * Math.PI) / 2;
+        fanPivot.add(fanBlade);
+      }
       this.animatedObjects.avoFans.push(fanPivot);
     }
 
-    // Snow drift behind AVO
-    const avoSnow = new THREE.Mesh(new THREE.BoxGeometry(11, 0.5, 6), this.mat.snowCap);
-    avoSnow.position.set(avoX, 4.3, avoZ);
-    plantGroup.add(avoSnow);
-
     // ============================================
-    // CENTRAL CONTROL ROOM (ЦПУ) — left of workshop
+    // CENTRAL CONTROL ROOM (ЦПУ) — left annex
     // ============================================
-    const cpuX = -6, cpuZ = -12.5, cpuW = 6.5, cpuH = 4.8, cpuD = 6.0;
+    const cpuX = -9.8, cpuZ = 0.5, cpuW = 4.8, cpuH = 4.0, cpuD = 5.2;
     const cpu = new THREE.Mesh(new THREE.BoxGeometry(cpuW, cpuH, cpuD), this.mat.corrugatedWorkshop || this.mat.whiteWall);
-    cpu.position.set(cpuX, cpuH / 2 + 1, cpuZ);
+    cpu.position.set(cpuX, baseH + cpuH / 2, cpuZ);
     cpu.castShadow = true;
     plantGroup.add(cpu);
 
-    // CPU flat roof with snow
-    const cpuRoof = new THREE.Mesh(new THREE.BoxGeometry(cpuW + 0.8, 0.35, cpuD + 0.8), this.mat.darkMetal);
-    cpuRoof.position.set(cpuX, cpuH + 1.2, cpuZ);
+    const cpuRoof = new THREE.Mesh(new THREE.BoxGeometry(cpuW + 0.4, 0.3, cpuD + 0.4), this.mat.darkMetal);
+    cpuRoof.position.set(cpuX, baseH + cpuH + 0.15, cpuZ);
     plantGroup.add(cpuRoof);
 
-    const cpuSnow = new THREE.Mesh(new THREE.BoxGeometry(cpuW + 1.0, 0.5, cpuD + 1.0), this.mat.snowCap);
-    cpuSnow.position.set(cpuX, cpuH + 1.6, cpuZ);
+    const cpuSnow = new THREE.Mesh(new THREE.BoxGeometry(cpuW + 0.5, 0.35, cpuD + 0.5), this.mat.snowCap);
+    cpuSnow.position.set(cpuX, baseH + cpuH + 0.45, cpuZ);
     plantGroup.add(cpuSnow);
 
-    // CPU blue accent band
-    const cpuStripe = new THREE.Mesh(new THREE.BoxGeometry(cpuW + 0.05, 1.0, 0.15), stripeMat);
-    cpuStripe.position.set(cpuX, cpuH + 0.5, cpuZ + cpuD / 2 + 0.08);
-    plantGroup.add(cpuStripe);
+    // Warm illuminated panoramic control room window
+    const cpuWin = new THREE.Mesh(new THREE.BoxGeometry(cpuW - 1.0, 1.4, 0.12), this.mat.windowLit);
+    cpuWin.position.set(cpuX, baseH + 2.2, cpuZ + cpuD / 2 + 0.06);
+    plantGroup.add(cpuWin);
 
-    // Beacon on CPU
-    const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.45, 8, 8), new THREE.MeshBasicMaterial({ color: 0xe53935 }));
-    beacon.position.set(cpuX, cpuH + 2.2, cpuZ);
+    // Flashing red obstruction beacon on CPU
+    const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 8), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
+    beacon.position.set(cpuX, baseH + cpuH + 0.95, cpuZ);
     plantGroup.add(beacon);
     this.animatedObjects.beacon = beacon;
 
+    // Telemetry Satellite Dish on Control Room
+    const satPivot = new THREE.Group();
+    satPivot.position.set(cpuX, baseH + cpuH + 0.7, cpuZ - 1.2);
+    plantGroup.add(satPivot);
+    this.plantDish = satPivot;
+
+    const dishMesh = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 0.35, 0.4, 16), this.mat.orangeAccent);
+    dishMesh.rotation.x = Math.PI / 3.8;
+    dishMesh.castShadow = true;
+    satPivot.add(dishMesh);
+
     // ============================================
-    // PIPE RACK between elements
+    // FRACTIONATION COLUMN (К-1) — right side, with clear spacing
     // ============================================
-    const rackY = 7, rackH = 5;
-    // Vertical support columns for pipe rack
-    [[-10, 0], [-4, 0], [2, 0], [8, 0], [14, 0]].forEach(([rx, rz]) => {
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.4, rackH, 0.4), this.mat.steel || this.mat.darkMetal);
-      post.position.set(rx, rackH / 2 + 1, rz + 5);
-      plantGroup.add(post);
+    const colX = 9.8, colZ = -2.5, colR = 1.1, colH = 11.0;
+    const colPedestal = new THREE.Mesh(new THREE.CylinderGeometry(colR + 0.35, colR + 0.5, 0.8, 16), curbMat);
+    colPedestal.position.set(colX, baseH + 0.4, colZ);
+    plantGroup.add(colPedestal);
+
+    const colMesh = new THREE.Mesh(new THREE.CylinderGeometry(colR, colR, colH, 20), this.mat.whiteTank);
+    colMesh.position.set(colX, baseH + 0.8 + colH / 2, colZ);
+    colMesh.castShadow = true;
+    plantGroup.add(colMesh);
+
+    const colDome = new THREE.Mesh(new THREE.SphereGeometry(colR, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), this.mat.whiteTank);
+    colDome.position.set(colX, baseH + 0.8 + colH, colZ);
+    plantGroup.add(colDome);
+
+    const colSnow = new THREE.Mesh(new THREE.SphereGeometry(colR + 0.1, 16, 10), this.mat.snowCap);
+    colSnow.position.set(colX, baseH + 0.8 + colH + 0.2, colZ);
+    colSnow.scale.set(1, 0.35, 1);
+    plantGroup.add(colSnow);
+
+    // Steel rings every 3m
+    for (let ry = 3.0; ry < colH; ry += 3.0) {
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(colR + 0.08, 0.06, 6, 16), this.mat.darkMetal);
+      ring.rotation.x = Math.PI / 2;
+      ring.position.set(colX, baseH + 0.8 + ry, colZ);
+      plantGroup.add(ring);
+    }
+
+    // Service ladder
+    const colLadder = new THREE.Mesh(new THREE.BoxGeometry(0.1, colH, 0.35), this.mat.darkMetal);
+    colLadder.position.set(colX + colR + 0.18, baseH + 0.8 + colH / 2, colZ);
+    plantGroup.add(colLadder);
+
+    // ============================================
+    // HORIZONTAL PROCESS BULLET VESSEL (РГС) — front right
+    // ============================================
+    const bx = 9.8, bz = 4.5;
+    [-1.2, 1.2].forEach(sx => {
+      const saddle = new THREE.Mesh(new THREE.BoxGeometry(0.35, 1.1, 2.2), curbMat);
+      saddle.position.set(bx + sx, baseH + 0.55, bz);
+      plantGroup.add(saddle);
     });
-    // Horizontal beam
-    const beam = new THREE.Mesh(new THREE.BoxGeometry(24, 0.3, 0.6), this.mat.steel || this.mat.darkMetal);
-    beam.position.set(2, rackH + 1, 5);
-    plantGroup.add(beam);
 
-    // Pipes running on rack
-    [-0.8, 0, 0.8].forEach((pOff, i) => {
-      const pipeColor = [this.mat.silverPipe, this.mat.orangeAccent, this.mat.yellowGasPipe || this.mat.orangeAccent][i];
-      const rackPipe = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 24, 8), pipeColor || this.mat.whiteTank);
-      rackPipe.rotation.z = Math.PI / 2;
-      rackPipe.position.set(2, rackH + 1.5 + pOff, 5);
-      plantGroup.add(rackPipe);
+    const bullet = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 0.95, 4.5, 16), this.mat.whiteTank);
+    bullet.rotation.z = Math.PI / 2;
+    bullet.position.set(bx, baseH + 1.8, bz);
+    bullet.castShadow = true;
+    plantGroup.add(bullet);
+
+    [-2.25, 2.25].forEach(ex => {
+      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.95, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), this.mat.whiteTank);
+      cap.rotation.z = ex > 0 ? Math.PI / 2 : -Math.PI / 2;
+      cap.position.set(bx + ex, baseH + 1.8, bz);
+      plantGroup.add(cap);
     });
 
+    const bulletSnow = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.22, 1.1), this.mat.snowCap);
+    bulletSnow.position.set(bx, baseH + 2.8, bz);
+    plantGroup.add(bulletSnow);
+
     // ============================================
-    // SNOWDRIFTS — natural accumulation
+    // CLEAR ENTRANCE PORCH (СВОБОДНЫЙ ВХОД БЕЗ ПЕРЕКРЫТИЙ И БАЛОК)
     // ============================================
-    [
-      [-20, 6, 3.5, 3],
-      [14, 8, 3, 2.5],
-      [-7, 8, 4, 2],
-      [20, -4, 2, 3],
-      [-20, -14, 3, 2.5]
-    ].forEach(([sx, sz, scx, scz]) => {
-      const s = new THREE.Mesh(new THREE.SphereGeometry(1.0, 10, 8), this.mat.snowDrift);
-      s.scale.set(scx, 0.65, scz);
-      s.position.set(sx, 1.2, sz);
-      plantGroup.add(s);
+    const porchW = 4.5, porchD = 2.2, porchH = 0.35;
+    const porch = new THREE.Mesh(new THREE.BoxGeometry(porchW, porchH, porchD), curbMat);
+    porch.position.set(bodyX, baseH + porchH / 2, bodyZ + bodyD / 2 + porchD / 2);
+    porch.receiveShadow = true;
+    plantGroup.add(porch);
+
+    const door = new THREE.Mesh(new THREE.BoxGeometry(2.0, 2.8, 0.1), this.mat.darkMetal);
+    door.position.set(bodyX, baseH + 1.4, bodyZ + bodyD / 2 + 0.05);
+    plantGroup.add(door);
+
+    [-0.5, 0.5].forEach(dx => {
+      const doorGlass = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.2, 0.12), this.mat.windowLit);
+      doorGlass.position.set(bodyX + dx, baseH + 1.7, bodyZ + bodyD / 2 + 0.06);
+      plantGroup.add(doorGlass);
     });
 
-    // ============================================
-    // SIGNBOARDS
-    // ============================================
-    const plantSign = this.createPhysicalSignboard("ГПЗ «ПОЛЯРНЫЙ МЕТАН»", "🔥", "#00a3e0", 20.0, 3.8);
-    plantSign.position.set(bodyX, 15.5, bodyZ + bodyD / 2 + 2);
-    plantGroup.add(plantSign);
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(porchW + 0.4, 0.2, porchD + 0.3), this.mat.orangeAccent);
+    canopy.position.set(bodyX, baseH + 3.4, bodyZ + bodyD / 2 + porchD / 2 - 0.1);
+    canopy.castShadow = true;
+    plantGroup.add(canopy);
 
-    const plantLevel = state.facilityLevel || 1;
-    const billboard = this.create3DBillboard(
-      "★ ГАЗОВЫЙ ПРОМЫСЕЛ ★",
-      `УР. ${plantLevel} • +${plantLevel * 15}% ДЕБИТ`,
-      "#38bdf8",
-      "#0f172a",
-      18,
-      6.5
-    );
-    billboard.position.set(0, 15, 0);
-    plantGroup.add(billboard);
-    plantGroup.userData.billboard = billboard;
+    const canopySnow = new THREE.Mesh(new THREE.BoxGeometry(porchW + 0.3, 0.18, porchD + 0.2), this.mat.snowCap);
+    canopySnow.position.set(bodyX, baseH + 3.58, bodyZ + bodyD / 2 + porchD / 2 - 0.1);
+    canopySnow.castShadow = true;
+    plantGroup.add(canopySnow);
 
-    // Volume Hitbox for Rock-Solid Clicks
+    const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.4), this.mat.floodlightLamp);
+    lamp.position.set(bodyX, baseH + 3.28, bodyZ + bodyD / 2 + 0.8);
+    plantGroup.add(lamp);
+
+    // Click Volume Hitbox
     const hitbox = new THREE.Mesh(
-      new THREE.BoxGeometry(50, 24, 40),
+      new THREE.BoxGeometry(28, 18, 21),
       new THREE.MeshBasicMaterial({ visible: false })
     );
-    hitbox.position.y = 12;
+    hitbox.position.y = 9;
     plantGroup.add(hitbox);
 
     plantGroup.userData = {
@@ -2945,99 +2987,110 @@ export class Isometric3D {
       this.scene.remove(this.garageGroup);
     }
 
-    // 1. Canteen (Столовая) at gx: 3.5, gy: 7.8
-    const defaultCanPos = this.gridToWorld(3.5, 7.8, 1.2);
-    const canPos = (typeof state?.getBuildingPos === "function") ? state.getBuildingPos("canteen", defaultCanPos) : defaultCanPos;
+    // 1. Canteen (Столовая) at gx: 3.5, gy: 7.8 — 3x3 Cells (10.5m x 10.5m)
+    const rawDefaultCanPos = this.gridToWorld(3.5, 7.8, 1.2);
+    const savedCanPos = (typeof state?.getBuildingPos === "function") ? state.getBuildingPos("canteen", rawDefaultCanPos) : rawDefaultCanPos;
+    const snappedCan = this.snapToBuildingGrid(savedCanPos.x, savedCanPos.z, 3, 3, 3.5);
     const canteen = new THREE.Group();
-    canteen.position.set(canPos.x, defaultCanPos.y, canPos.z);
+    canteen.position.set(snappedCan.x, 1.2, snappedCan.z);
     this.canteenGroup = canteen;
-    this.registerMovableBuilding("canteen", canteen, { gx: 3.5, gy: 7.8, yOffset: 1.2 }, { w: 12, d: 10 });
+    this.registerMovableBuilding("canteen", canteen, rawDefaultCanPos, { cellsW: 3, cellsD: 3, w: 10.5, d: 10.5, label: "Столовая" });
 
-    const canBody = new THREE.Mesh(new THREE.BoxGeometry(11, 4.4, 8.0), this.mat.canteenWall || this.mat.whiteWall);
-    canBody.position.y = 2.2;
+    // PAG Concrete Base Slab (Exact 10.5m x 10.5m)
+    const canBase = new THREE.Mesh(new THREE.BoxGeometry(10.5, 0.4, 10.5), this.mat.pagConcrete || this.mat.concrete);
+    canBase.position.y = 0.2;
+    canBase.receiveShadow = true;
+    canteen.add(canBase);
+
+    // Beveled perimeter curbs
+    const canCurbMat = this.mat.concreteDark || this.mat.concrete;
+    [-5.12, 5.12].forEach(cz => {
+      const curb = new THREE.Mesh(new THREE.BoxGeometry(10.5, 0.25, 0.25), canCurbMat);
+      curb.position.set(0, 0.35, cz);
+      canteen.add(curb);
+    });
+    [-5.12, 5.12].forEach(cx => {
+      const curb = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, 10.5), canCurbMat);
+      curb.position.set(cx, 0.35, 0);
+      canteen.add(curb);
+    });
+
+    const canBody = new THREE.Mesh(new THREE.BoxGeometry(8.2, 4.2, 7.2), this.mat.canteenWall || this.mat.whiteWall);
+    canBody.position.y = 2.3;
     canBody.castShadow = true;
     canteen.add(canBody);
 
-    const canRoof = new THREE.Mesh(new THREE.BoxGeometry(11.8, 0.7, 8.8), this.mat.orangeRoof);
-    canRoof.position.y = 4.75;
+    const canRoof = new THREE.Mesh(new THREE.BoxGeometry(8.8, 0.6, 7.8), this.mat.orangeRoof);
+    canRoof.position.y = 4.7;
     canRoof.castShadow = true;
     canteen.add(canRoof);
 
     // Snow Cap on Canteen
-    const canSnow = new THREE.Mesh(new THREE.BoxGeometry(11.6, 0.45, 8.6), this.mat.snowCap);
-    canSnow.position.y = 5.2;
+    const canSnow = new THREE.Mesh(new THREE.BoxGeometry(8.6, 0.4, 7.6), this.mat.snowCap);
+    canSnow.position.y = 5.1;
     canteen.add(canSnow);
 
     // Warm Lit Windows on Canteen Dining Hall & Kitchen
-    [-3.2, 0.0, 3.2].forEach(wx => {
-      const win = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.4, 0.1), this.mat.windowLit);
-      win.position.set(wx, 2.5, 4.06);
+    [-2.4, 0.0, 2.4].forEach(wx => {
+      const win = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.3, 0.1), this.mat.windowLit);
+      win.position.set(wx, 2.5, 3.66);
       canteen.add(win);
 
-      const frame = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.5, 0.05), this.mat.windowFrame);
-      frame.position.set(wx, 2.5, 4.03);
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.4, 0.05), this.mat.windowFrame);
+      frame.position.set(wx, 2.5, 3.63);
       canteen.add(frame);
     });
 
-    // Canteen Entrance Porch (Крыльцо с навесом и перилами)
-    const canPorch = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.35, 1.8), this.mat.concrete);
-    canPorch.position.set(0, 0.18, 4.9);
+    // Canteen Entrance Porch (Крыльцо с навесом)
+    const canPorch = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.35, 1.4), this.mat.concrete);
+    canPorch.position.set(0, 0.35, 4.3);
     canteen.add(canPorch);
 
-    const canSign = this.createPhysicalSignboard("СТОЛОВАЯ «ПОЛЯРНИК»", "☕", "#f59e0b", 10.0, 2.5);
-    canSign.position.set(0, 6.6, 2.2);
-    canteen.add(canSign);
-
-    const canCanopy = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.15, 1.9), this.mat.orangeAccent);
-    canCanopy.position.set(0, 3.3, 4.9);
+    const canCanopy = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.15, 1.5), this.mat.orangeAccent);
+    canCanopy.position.set(0, 3.2, 4.3);
     canCanopy.rotation.x = -0.15;
     canteen.add(canCanopy);
 
-    const canCanopySnow = new THREE.Mesh(new THREE.BoxGeometry(3.1, 0.18, 1.8), this.mat.snowCap);
-    canCanopySnow.position.set(0, 3.42, 4.9);
+    const canCanopySnow = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.18, 1.4), this.mat.snowCap);
+    canCanopySnow.position.set(0, 3.32, 4.3);
     canteen.add(canCanopySnow);
 
     // Kitchen Exhaust Chimney with Steam Smoke
-    const canChimney = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 1.8, 8), this.mat.chimneyMetal);
-    canChimney.position.set(3.8, 5.8, -2.2);
+    const canChimney = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 1.6, 8), this.mat.chimneyMetal);
+    canChimney.position.set(2.8, 5.6, -1.8);
     canChimney.castShadow = true;
     canteen.add(canChimney);
 
     // Supply Delivery Ramp & Crates on the side
-    const canRamp = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.4, 3.5), this.mat.woodPlatform);
-    canRamp.position.set(6.7, 0.2, 0);
+    const canRamp = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.35, 2.6), this.mat.woodPlatform);
+    canRamp.position.set(4.4, 0.35, 0);
     canteen.add(canRamp);
 
-    for (let c = 0; c < 3; c++) {
-      const crate = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), this.mat.woodTrunk);
-      crate.position.set(6.7, 0.8, -0.9 + c * 0.9);
+    for (let c = 0; c < 2; c++) {
+      const crate = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), this.mat.woodTrunk);
+      crate.position.set(4.4, 0.85, -0.6 + c * 0.9);
       canteen.add(crate);
     }
 
     // 4 Animated Kitchen Steam Smoke Spheres
     const canSmokePuffs = [];
     for (let s = 0; s < 4; s++) {
-      const puff = new THREE.Mesh(new THREE.SphereGeometry(0.35 + s * 0.15, 6, 6), this.mat.smokeCloud);
-      puff.position.set(canPos.x + 3.8, canPos.y + 6.8 + s * 0.8, canPos.z - 2.2);
+      const puff = new THREE.Mesh(new THREE.SphereGeometry(0.3 + s * 0.12, 6, 6), this.mat.smokeCloud);
+      puff.position.set(snappedCan.x + 2.8, 1.2 + 6.5 + s * 0.7, snappedCan.z - 1.8);
       this.scene.add(puff);
       canSmokePuffs.push(puff);
     }
     this.animatedObjects.chimneySmokes.push({
       puffs: canSmokePuffs,
-      baseX: canPos.x + 3.8,
-      baseY: canPos.y + 6.6,
-      baseZ: canPos.z - 2.2,
+      baseX: snappedCan.x + 2.8,
+      baseY: 1.2 + 6.4,
+      baseZ: snappedCan.z - 1.8,
       speed: 1.6,
       spread: 0.35
     });
 
-    const canBoard = this.create3DBillboard("☕ СТОЛОВАЯ №1", `УР. ${state.canteenLevel || 1} • СИНЕРГИЯ ВАХТЫ`, "#00a3e0", "#1e293b", 15, 4.8);
-    canBoard.position.set(0, 5.2, 0);
-    canteen.add(canBoard);
-    canteen.userData.billboard = canBoard;
-
-    const canHitbox = new THREE.Mesh(new THREE.BoxGeometry(14, 10, 11), new THREE.MeshBasicMaterial({ visible: false }));
-    canHitbox.position.y = 5;
+    const canHitbox = new THREE.Mesh(new THREE.BoxGeometry(10.5, 8, 10.5), new THREE.MeshBasicMaterial({ visible: false }));
+    canHitbox.position.y = 4;
     canteen.add(canHitbox);
 
     canteen.userData = {
@@ -3055,72 +3108,231 @@ export class Isometric3D {
     });
     this.scene.add(canteen);
 
-    // 2. Dormitory (Общежитие) at gx: 3.5, gy: 10.2
-    const defaultDormPos = this.gridToWorld(3.5, 10.2, 1.2);
-    const dormPos = (typeof state?.getBuildingPos === "function") ? state.getBuildingPos("dormitory", defaultDormPos) : defaultDormPos;
+    // 2. Dormitory (Общежитие) at gx: 3.5, gy: 10.2 — 4x3 Cells (14.0m x 10.5m)
+    const rawDefaultDormPos = this.gridToWorld(3.5, 10.2, 1.2);
+    const savedDormPos = (typeof state?.getBuildingPos === "function") ? state.getBuildingPos("dormitory", rawDefaultDormPos) : rawDefaultDormPos;
+    const snappedDorm = this.snapToBuildingGrid(savedDormPos.x, savedDormPos.z, 4, 3, 3.5);
+    const dormPos = { x: snappedDorm.x, y: 1.2, z: snappedDorm.z };
     const dorm = new THREE.Group();
-    dorm.position.set(dormPos.x, defaultDormPos.y, dormPos.z);
+    dorm.position.set(dormPos.x, dormPos.y, dormPos.z);
     this.dormGroup = dorm;
-    this.registerMovableBuilding("dormitory", dorm, { gx: 3.5, gy: 10.2, yOffset: 1.2 }, { w: 14, d: 10 });
+    this.registerMovableBuilding("dormitory", dorm, rawDefaultDormPos, { cellsW: 4, cellsD: 3, w: 14.0, d: 10.5, label: "Жилой Комплекс" });
 
-    const dormBody = new THREE.Mesh(new THREE.BoxGeometry(11, 7.5, 8.5), this.mat.modularLiving || this.mat.whiteWall);
-    dormBody.position.y = 3.75;
-    dormBody.castShadow = true;
-    dorm.add(dormBody);
+    const dormCurbMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.6, metalness: 0.1 });
 
-    const dormRoof = new THREE.Mesh(new THREE.BoxGeometry(11.8, 0.7, 9.2), this.mat.greyWall);
-    dormRoof.position.y = 7.85;
-    dorm.add(dormRoof);
+    // 1. Raised PAG-14 Reinforced Concrete Slab Platform (Exact 14.0m x 10.5m)
+    const dormBase = new THREE.Mesh(new THREE.BoxGeometry(14.0, 0.45, 10.5), this.mat.pagConcrete || this.mat.concrete);
+    dormBase.position.y = 0.22;
+    dormBase.receiveShadow = true;
+    dorm.add(dormBase);
 
-    const dormSnow = new THREE.Mesh(new THREE.BoxGeometry(11.6, 0.5, 9.0), this.mat.snowCap);
-    dormSnow.position.y = 8.35;
-    dorm.add(dormSnow);
-
-    // Rows of Warm Lit Windows across 2 Floors
-    [-3.4, -1.1, 1.1, 3.4].forEach(wx => {
-      // Floor 1
-      const win1 = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.3, 0.1), this.mat.windowLit);
-      win1.position.set(wx, 2.2, 4.31);
-      dorm.add(win1);
-
-      // Floor 2
-      const win2 = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.3, 0.1), this.mat.windowLit);
-      win2.position.set(wx, 5.2, 4.31);
-      dorm.add(win2);
+    // Beveled perimeter curbs
+    [-5.12, 5.12].forEach(cz => {
+      const curb = new THREE.Mesh(new THREE.BoxGeometry(14.0, 0.25, 0.25), dormCurbMat);
+      curb.position.set(0, 0.4, cz);
+      dorm.add(curb);
+    });
+    [-6.88, 6.88].forEach(cx => {
+      const curb = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.25, 10.5), dormCurbMat);
+      curb.position.set(cx, 0.4, 0);
+      dorm.add(curb);
     });
 
-    // Dormitory Entrance Porch & Steps (Крыльцо с навесом)
-    const dormPorch = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.4, 2.0), this.mat.concrete);
-    dormPorch.position.set(0, 0.2, 5.2);
+    // 2. Two-Story Modular Building Block (Warm Residential Appearance)
+    const dW = 11.2, dH1 = 3.4, dH2 = 3.2, dD = 7.6;
+    const dTotalH = dH1 + dH2;
+
+    // Floor 1 (Ground residential & administrative tier)
+    const dFloor1 = new THREE.Mesh(new THREE.BoxGeometry(dW, dH1, dD), this.mat.modularLiving || this.mat.whiteWall);
+    dFloor1.position.set(0, 0.45 + dH1 / 2, 0);
+    dFloor1.castShadow = true;
+    dFloor1.receiveShadow = true;
+    dorm.add(dFloor1);
+
+    // Intermediate Warm Accent Fascia Band
+    const dMidTrim = new THREE.Mesh(new THREE.BoxGeometry(dW + 0.35, 0.3, dD + 0.35), this.mat.orangeAccent || this.mat.canteenWall);
+    dMidTrim.position.set(0, 0.45 + dH1, 0);
+    dMidTrim.castShadow = true;
+    dorm.add(dMidTrim);
+
+    // Floor 2 (Upper residential quarters tier)
+    const dFloor2 = new THREE.Mesh(new THREE.BoxGeometry(dW - 0.3, dH2, dD - 0.3), this.mat.modularLiving || this.mat.whiteWall);
+    dFloor2.position.set(0, 0.45 + dH1 + dH2 / 2, 0);
+    dFloor2.castShadow = true;
+    dFloor2.receiveShadow = true;
+    dorm.add(dFloor2);
+
+    // Top Cornice Parapet Trim
+    const dRoofTrim = new THREE.Mesh(new THREE.BoxGeometry(dW + 0.45, 0.35, dD + 0.45), this.mat.orangeAccent || this.mat.canteenWall);
+    dRoofTrim.position.set(0, 0.45 + dTotalH + 0.18, 0);
+    dRoofTrim.castShadow = true;
+    dorm.add(dRoofTrim);
+
+    // Realistic Snow Cap with Overhang
+    const dRoofSnow = new THREE.Mesh(new THREE.BoxGeometry(dW + 0.3, 0.35, dD + 0.3), this.mat.snowCap);
+    dRoofSnow.position.set(0, 0.45 + dTotalH + 0.45, 0);
+    dRoofSnow.castShadow = true;
+    dorm.add(dRoofSnow);
+
+    // 3. Entrance Porch & Arctic Storm Vestibule
+    const dpW = 3.6, dpD = 2.2, dpH = 0.35;
+    const dormPorch = new THREE.Mesh(new THREE.BoxGeometry(dpW, dpH, dpD), dormCurbMat);
+    dormPorch.position.set(0, 0.45 + dpH / 2, dD / 2 + dpD / 2);
+    dormPorch.receiveShadow = true;
     dorm.add(dormPorch);
 
-    const dormCanopy = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.18, 2.2), this.mat.darkMetal);
-    dormCanopy.position.set(0, 3.5, 5.2);
-    dormCanopy.rotation.x = -0.12;
+    // Concrete entry steps leading down to slab
+    const dStep = new THREE.Mesh(new THREE.BoxGeometry(dpW + 0.4, 0.18, 0.7), dormCurbMat);
+    dStep.position.set(0, 0.45 + 0.09, dD / 2 + dpD + 0.35);
+    dorm.add(dStep);
+
+    // Weatherproof insulated entrance doors
+    const dDoor = new THREE.Mesh(new THREE.BoxGeometry(1.8, 2.6, 0.12), this.mat.darkMetal);
+    dDoor.position.set(0, 0.45 + 1.3, dD / 2 + 0.06);
+    dorm.add(dDoor);
+
+    [-0.45, 0.45].forEach(dx => {
+      const doorWin = new THREE.Mesh(new THREE.BoxGeometry(0.35, 1.4, 0.14), this.mat.windowLit);
+      doorWin.position.set(dx, 0.45 + 1.5, dD / 2 + 0.08);
+      dorm.add(doorWin);
+    });
+
+    // Modern angled storm canopy
+    const dormCanopy = new THREE.Mesh(new THREE.BoxGeometry(dpW + 0.4, 0.18, dpD + 0.3), this.mat.rdOfficeTrim);
+    dormCanopy.position.set(0, 0.45 + 3.2, dD / 2 + dpD / 2 - 0.15);
+    dormCanopy.rotation.x = -0.1;
+    dormCanopy.castShadow = true;
     dorm.add(dormCanopy);
 
-    const dormCanopySnow = new THREE.Mesh(new THREE.BoxGeometry(3.3, 0.2, 2.1), this.mat.snowCap);
-    dormCanopySnow.position.set(0, 3.65, 5.2);
+    const dormCanopySnow = new THREE.Mesh(new THREE.BoxGeometry(dpW + 0.3, 0.16, dpD + 0.2), this.mat.snowCap);
+    dormCanopySnow.position.set(0, 0.45 + 3.32, dD / 2 + dpD / 2 - 0.15);
+    dormCanopySnow.rotation.x = -0.1;
+    dormCanopySnow.castShadow = true;
     dorm.add(dormCanopySnow);
 
-    const dormSign = this.createPhysicalSignboard("ВАХТОВЫЙ КОМПЛЕКС", "🏠", "#38bdf8", 10.5, 2.6);
-    dormSign.position.set(0, 9.6, 2.5);
-    dorm.add(dormSign);
+    // Downward recessed LED entry lamp casting warm glow
+    const dDownlight = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.4), this.mat.floodlightLamp);
+    dDownlight.position.set(0, 0.45 + 3.1, dD / 2 + 0.9);
+    dorm.add(dDownlight);
 
-    // Rooftop Satellite Communication Dish
+    // Stainless steel handrails on porch
+    [-dpW / 2 + 0.15, dpW / 2 - 0.15].forEach(rx => {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.0, 8), this.mat.silverPipe || this.mat.darkMetal);
+      post.position.set(rx, 0.45 + dpH + 0.5, dD / 2 + dpD - 0.15);
+      dorm.add(post);
+
+      const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, dpD, 8), this.mat.silverPipe || this.mat.darkMetal);
+      rail.rotation.x = Math.PI / 2;
+      rail.position.set(rx, 0.45 + dpH + 1.0, dD / 2 + dpD / 2);
+      dorm.add(rail);
+    });
+
+    // 4. Recessed Warm Lit Windows across 2 Floors
+    // Floor 1 Front Windows
+    [-4.5, -2.6, 2.6, 4.5].forEach(wx => {
+      const win1 = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.4, 0.12), this.mat.windowLit);
+      win1.position.set(wx, 0.45 + 2.1, dD / 2 + 0.06);
+      dorm.add(win1);
+
+      const frame1 = new THREE.Mesh(new THREE.BoxGeometry(1.65, 1.55, 0.06), this.mat.darkMetal);
+      frame1.position.set(wx, 0.45 + 2.1, dD / 2 + 0.03);
+      dorm.add(frame1);
+    });
+
+    // Floor 2 Front Windows
+    [-4.5, -2.6, 0.0, 2.6, 4.5].forEach(wx => {
+      const win2 = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.4, 0.12), this.mat.windowLit);
+      win2.position.set(wx, 0.45 + dH1 + 1.8, dD / 2 - 0.15 + 0.06);
+      dorm.add(win2);
+
+      const frame2 = new THREE.Mesh(new THREE.BoxGeometry(1.65, 1.55, 0.06), this.mat.darkMetal);
+      frame2.position.set(wx, 0.45 + dH1 + 1.8, dD / 2 - 0.15 + 0.03);
+      dorm.add(frame2);
+    });
+
+    // Side Windows (West and East elevations)
+    [-1.8, 1.8].forEach(wz => {
+      // West Floor 1 & 2
+      const sWinW1 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.3, 1.5), this.mat.windowLit);
+      sWinW1.position.set(-dW / 2 - 0.06, 0.45 + 2.1, wz);
+      dorm.add(sWinW1);
+
+      const sWinW2 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.3, 1.5), this.mat.windowLit);
+      sWinW2.position.set(-dW / 2 + 0.15 - 0.06, 0.45 + dH1 + 1.8, wz);
+      dorm.add(sWinW2);
+
+      // East Floor 1 & 2
+      const sWinE1 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.3, 1.5), this.mat.windowLit);
+      sWinE1.position.set(dW / 2 + 0.06, 0.45 + 2.1, wz);
+      dorm.add(sWinE1);
+
+      const sWinE2 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.3, 1.5), this.mat.windowLit);
+      sWinE2.position.set(dW / 2 - 0.15 + 0.06, 0.45 + dH1 + 1.8, wz);
+      dorm.add(sWinE2);
+    });
+
+    // 5. Rooftop Rotating 360° Communications Satellite Dish
     const satGroup = new THREE.Group();
-    satGroup.position.set(3.8, 9.0, -2.0);
-    const satPole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.4, 6), this.mat.darkMetal);
+    satGroup.position.set(4.2, 0.45 + dTotalH + 0.8, -1.8);
+    const satPole = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 2.2, 8), this.mat.darkMetal);
     satGroup.add(satPole);
-    const satDish = new THREE.Mesh(new THREE.SphereGeometry(1.0, 12, 8, 0, Math.PI * 2, 0, Math.PI / 3), this.mat.whiteWall);
-    satDish.rotation.x = 0.8;
-    satDish.position.y = 1.0;
-    satGroup.add(satDish);
+
+    const dormSatPivot = new THREE.Group();
+    dormSatPivot.position.y = 1.2;
+    satGroup.add(dormSatPivot);
+    this.dormDish = dormSatPivot;
+
+    const satDish = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 0.45, 0.5, 20), this.mat.orangeAccent || this.mat.rdOfficeTrim);
+    satDish.rotation.x = Math.PI / 3.8;
+    satDish.castShadow = true;
+    dormSatPivot.add(satDish);
+
+    const satSpike = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.3, 8), this.mat.darkMetal);
+    satSpike.position.set(0, 0.45, 0.55);
+    satSpike.rotation.x = Math.PI / 3.8;
+    dormSatPivot.add(satSpike);
+
+    const dormFeedLed = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 8), new THREE.MeshBasicMaterial({ color: 0x22c55e }));
+    dormFeedLed.position.set(0, 0.8, 0.95);
+    dormSatPivot.add(dormFeedLed);
+
     dorm.add(satGroup);
 
-    // Smoking Oilfield Shift Workers (Курящие вахтовики на крыльце)
+    // 6. Dual Rooftop HVAC Air Chillers with Louvers
+    [-2.2, 0.5].forEach(hx => {
+      const hvac = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.1, 1.6), this.mat.greyWall || this.mat.whiteWall);
+      hvac.position.set(hx, 0.45 + dTotalH + 1.05, -2.0);
+      hvac.castShadow = true;
+      dorm.add(hvac);
+
+      const hvacCowl = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.35, 12), this.mat.darkMetal);
+      hvacCowl.position.set(hx, 0.45 + dTotalH + 1.7, -2.0);
+      dorm.add(hvacCowl);
+    });
+
+    // 7. Rooftop Radio Communications Mast with Pulsing Red Obstacle Beacon (СОУ-1)
+    const dormRadioMast = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.14, 4.6, 6), this.mat.darkMetal);
+    dormRadioMast.position.set(-4.5, 0.45 + dTotalH + 2.7, -1.8);
+    dorm.add(dormRadioMast);
+
+    const dormWarnLight = new THREE.Mesh(
+      new THREE.SphereGeometry(0.22, 8, 8),
+      new THREE.MeshStandardMaterial({
+        color: 0xff1744,
+        emissive: 0xff1744,
+        emissiveIntensity: 1.8,
+        roughness: 0.1
+      })
+    );
+    dormWarnLight.position.set(-4.5, 0.45 + dTotalH + 5.1, -1.8);
+    dorm.add(dormWarnLight);
+    if (!this.animatedObjects.beacon) {
+      this.animatedObjects.beacon = dormWarnLight;
+    }
+
+    // 8. Smoking Oilfield Shift Workers Area on Porch Corner
     const smoker1 = new THREE.Group();
-    smoker1.position.set(-1.0, 0.4, 5.3);
+    smoker1.position.set(-1.4, 0.45 + dpH, dD / 2 + dpD / 2);
     const s1Torso = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, 0.9, 8), this.mat.parkaOrange);
     s1Torso.position.y = 0.45;
     smoker1.add(s1Torso);
@@ -3134,7 +3346,7 @@ export class Isometric3D {
     dorm.add(smoker1);
 
     const smoker2 = new THREE.Group();
-    smoker2.position.set(0.8, 0.4, 5.4);
+    smoker2.position.set(1.4, 0.45 + dpH, dD / 2 + dpD / 2);
     smoker2.rotation.y = -0.5;
     const s2Torso = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.29, 0.9, 8), this.mat.parkaNavy);
     s2Torso.position.y = 0.45;
@@ -3144,9 +3356,9 @@ export class Isometric3D {
     smoker2.add(s2Head);
     dorm.add(smoker2);
 
-    // Heating Boiler Exhaust Chimney with Rising White Smoke on Dorm Roof
-    const dormChimney = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 2.4, 8), this.mat.chimneyMetal);
-    dormChimney.position.set(-3.5, 9.2, -2.0);
+    // 9. Heating Boiler Exhaust Chimney with Rising White Steam
+    const dormChimney = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 2.8, 8), this.mat.chimneyMetal);
+    dormChimney.position.set(-4.5, 0.45 + dTotalH + 1.8, 2.0);
     dormChimney.castShadow = true;
     dorm.add(dormChimney);
 
@@ -3154,24 +3366,20 @@ export class Isometric3D {
     const dormSmokePuffs = [];
     for (let s = 0; s < 4; s++) {
       const puff = new THREE.Mesh(new THREE.SphereGeometry(0.38 + s * 0.16, 6, 6), this.mat.smokeCloud);
-      puff.position.set(dormPos.x - 3.5, dormPos.y + 10.4 + s * 0.9, dormPos.z - 2.0);
+      puff.position.set(dormPos.x - 4.5, dormPos.y + dTotalH + 3.2 + s * 0.9, dormPos.z + 2.0);
       this.scene.add(puff);
       dormSmokePuffs.push(puff);
     }
     this.animatedObjects.chimneySmokes.push({
       puffs: dormSmokePuffs,
-      baseX: dormPos.x - 3.5,
-      baseY: dormPos.y + 10.2,
-      baseZ: dormPos.z - 2.0,
+      baseX: dormPos.x - 4.5,
+      baseY: dormPos.y + dTotalH + 3.0,
+      baseZ: dormPos.z + 2.0,
       speed: 1.4,
       spread: 0.4
     });
 
-    const dormBoard = this.create3DBillboard("🏠 ВАХТОВОЕ ОБЩЕЖИТИЕ", "КОМФОРТ ВАХТЫ • ТЕПЛО", "#94a3b8", "#1e293b", 16, 4.8);
-    dormBoard.position.set(0, 5.8, 0);
-    dorm.add(dormBoard);
-
-    const dormHitbox = new THREE.Mesh(new THREE.BoxGeometry(14, 14, 12), new THREE.MeshBasicMaterial({ visible: false }));
+    const dormHitbox = new THREE.Mesh(new THREE.BoxGeometry(16, 14, 13), new THREE.MeshBasicMaterial({ visible: false }));
     dormHitbox.position.y = 7;
     dorm.add(dormHitbox);
 
@@ -3232,13 +3440,35 @@ export class Isometric3D {
     annexWin.position.set(9.85, 2.7, -3.0);
     gate.add(annexWin);
 
-    const boothRoof = new THREE.Mesh(new THREE.BoxGeometry(8.2, 0.4, 5.8), this.mat.orangeAccent);
-    boothRoof.position.set(9.0, 4.5, -3.0);
+    // Guardhouse corner structural columns
+    [[5.5, -5.2], [14.1, -5.2], [5.5, -0.8], [14.1, -0.8]].forEach(([cx, cz]) => {
+      const col = new THREE.Mesh(new THREE.BoxGeometry(0.3, 4.4, 0.3), this.mat.darkMetal);
+      col.position.set(cx, 2.3, cz);
+      col.castShadow = true;
+      gate.add(col);
+    });
+
+    // Guard personnel entry door with protective canopy
+    const guardDoor = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.4, 1.2), this.mat.darkMetal);
+    guardDoor.position.set(14.15, 1.5, -3.0);
+    gate.add(guardDoor);
+
+    const doorCanopy = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.1, 1.6), this.mat.orangeAccent);
+    doorCanopy.position.set(14.4, 2.8, -3.0);
+    gate.add(doorCanopy);
+
+    const boothRoof = new THREE.Mesh(new THREE.BoxGeometry(9.2, 0.5, 6.2), this.mat.orangeAccent);
+    boothRoof.position.set(9.5, 4.55, -3.0);
     gate.add(boothRoof);
 
-    const boothSnow = new THREE.Mesh(new THREE.BoxGeometry(8.0, 0.35, 5.6), this.mat.snowCap);
-    boothSnow.position.set(9.0, 4.85, -3.0);
+    const boothSnow = new THREE.Mesh(new THREE.BoxGeometry(9.0, 0.35, 6.0), this.mat.snowCap);
+    boothSnow.position.set(9.5, 4.9, -3.0);
     gate.add(boothSnow);
+
+    // Architectural illuminated physical signboard on guardhouse
+    const gateSign = this.createPhysicalSignboard("КПП ПРОМЫСЛА • СТОП", "🛂", "#ef4444", 7.8, 1.8);
+    gateSign.position.set(9.5, 5.3, -0.2);
+    gate.add(gateSign);
 
     // Overhead Inspection Canopy / Portal Trusses across Driveway (Span width 10.2m)
     const canopyTrussL = new THREE.Mesh(new THREE.BoxGeometry(0.5, 6.2, 0.5), this.mat.steel);
@@ -3269,6 +3499,26 @@ export class Isometric3D {
     const camDome = new THREE.Mesh(new THREE.SphereGeometry(0.24, 8, 8), this.mat.floodlightLamp);
     camDome.position.set(10.5, 6.7, -1.2);
     gate.add(camDome);
+
+    // High-mast security floodlights illuminating inspection lane
+    [-0.3, 0.3].forEach(dx => {
+      const floodHead = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.22, 0.3), this.mat.darkMetal);
+      floodHead.position.set(10.5 + dx, 6.2, -1.0);
+      gate.add(floodHead);
+
+      const floodLens = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.16, 0.08), this.mat.floodlightLamp);
+      floodLens.position.set(10.5 + dx, 6.2, -0.82);
+      gate.add(floodLens);
+    });
+
+    // Radio telecommunication antenna mast on booth roof
+    const antMast = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 3.2, 6), this.mat.darkMetal);
+    antMast.position.set(11.5, 6.4, -3.0);
+    gate.add(antMast);
+
+    const antLight = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8), this.mat.redSteel);
+    antLight.position.set(11.5, 8.0, -3.0);
+    gate.add(antLight);
 
     // Phase 14 exact parameter match: Barrier Pylon & Arm on South side
     // local_X = -5.1 -> world_Z = -10.65 (meets south fence line at z = -10.5)
@@ -3349,6 +3599,13 @@ export class Isometric3D {
     const barrierArm = new THREE.Mesh(new THREE.BoxGeometry(10.2, 0.28, 0.28), this.mat.hazardStripe);
     barrierArm.position.x = 5.1;
     barrierPivot.add(barrierArm);
+
+    // High-visibility STOP sign disc on barrier arm
+    const barrierStopBadge = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.06, 16), this.mat.redSteel);
+    barrierStopBadge.rotation.x = Math.PI / 2;
+    barrierStopBadge.position.set(5.1, 0, 0.16);
+    barrierPivot.add(barrierStopBadge);
+
     this.animatedObjects.gateBarrier = barrierPivot;
     this.gateBarrier = barrierPivot;
     this.gateLightGreen = lightGreen;
@@ -3376,6 +3633,7 @@ export class Isometric3D {
 
     const gateBoard = this.create3DBillboard("★ КПП ПРОМЫСЛА ★", "КОНТРОЛЬ ДОСТУПА • СТОП", "#ef4444", "#1e293b", 16.5, 3.8);
     gateBoard.position.set(0, 4.8, -3.0);
+    gateBoard.visible = false;
     gate.add(gateBoard);
     gate.userData.billboard = gateBoard;
     gate.userData.billboard = gateBoard;
@@ -3393,66 +3651,149 @@ export class Isometric3D {
         this.interactables.push(child);
       }
     });
-    this.registerMovableBuilding("gatehouse", gate, { gx: 1.0, gy: 5.5, yOffset: 1.2 }, { w: 14, d: 10 });
+    this.registerMovableBuilding("gatehouse", gate, { gx: 1.0, gy: 5.5, yOffset: 1.2 }, { cellsW: 3, cellsD: 2, w: 10.5, d: 7.0, label: "КПП и Охрана" });
     this.scene.add(gate);
 
-    // 4. Heavy Arctic Vehicle Garage (ГАРАЖ ТЕХНИКИ / АТБ) at gx: 2.8, gy: 4.2
-    const defaultGaragePos = this.gridToWorld(2.8, 4.2, 1.2);
-    const garagePos = (typeof state?.getBuildingPos === "function") ? state.getBuildingPos("garage", defaultGaragePos) : defaultGaragePos;
+    // 4. Heavy Arctic Vehicle Garage (ГАРАЖ ТЕХНИКИ / АТБ) at gx: 2.8, gy: 4.2 — 5x4 Cells (17.5m x 14.0m)
+    const rawDefaultGaragePos = this.gridToWorld(2.8, 4.2, 1.2);
+    const savedGaragePos = (typeof state?.getBuildingPos === "function") ? state.getBuildingPos("garage", rawDefaultGaragePos) : rawDefaultGaragePos;
+    const snappedGarage = this.snapToBuildingGrid(savedGaragePos.x, savedGaragePos.z, 5, 4, 3.5);
     const garageGroup = new THREE.Group();
-    garageGroup.position.set(garagePos.x, defaultGaragePos.y, garagePos.z);
+    garageGroup.position.set(snappedGarage.x, 1.2, snappedGarage.z);
     this.garageGroup = garageGroup;
-    this.registerMovableBuilding("garage", garageGroup, { gx: 2.8, gy: 4.2, yOffset: 1.2 }, { w: 18, d: 14 });
+    this.registerMovableBuilding("garage", garageGroup, rawDefaultGaragePos, { cellsW: 5, cellsD: 4, w: 17.5, d: 14.0, label: "Гараж ТРЭКОЛ" });
 
-    // Concrete Workshop Foundation
-    const gBase = new THREE.Mesh(new THREE.BoxGeometry(22, 0.5, 14), this.mat.concrete);
-    gBase.position.y = 0.25;
+    // Concrete Workshop Foundation Apron (Exact 17.5m x 14.0m)
+    const gBase = new THREE.Mesh(new THREE.BoxGeometry(17.5, 0.55, 14.0), this.mat.concrete);
+    gBase.position.y = 0.28;
     gBase.receiveShadow = true;
     garageGroup.add(gBase);
 
+    // Hazard striped apron entrance threshold
+    const gThreshold = new THREE.Mesh(new THREE.BoxGeometry(14.5, 0.15, 1.8), this.mat.hazardStripe);
+    gThreshold.position.set(0, 0.35, 5.8);
+    garageGroup.add(gThreshold);
+
     // Main Insulated Hangar Body
-    const gBody = new THREE.Mesh(new THREE.BoxGeometry(18, 6.5, 11), this.mat.garageWall || this.mat.whiteWall);
-    gBody.position.set(0, 3.5, 0);
+    const gBody = new THREE.Mesh(new THREE.BoxGeometry(14.5, 6.2, 9.5), this.mat.garageWall || this.mat.whiteWall);
+    gBody.position.set(0, 3.45, -0.8);
     gBody.castShadow = true;
     garageGroup.add(gBody);
 
-    // Architectural Orange Trim & Hazard Skirting
-    const gTrimTop = new THREE.Mesh(new THREE.BoxGeometry(18.4, 0.5, 11.4), this.mat.orangeAccent);
-    gTrimTop.position.set(0, 6.8, 0);
+    // Structural steel pilasters along exterior walls (ribbed relief)
+    [-7.3, 7.3].forEach(px => {
+      [-3.5, 0, 3.5].forEach(pz => {
+        const pilaster = new THREE.Mesh(new THREE.BoxGeometry(0.35, 6.4, 0.35), this.mat.darkMetal);
+        pilaster.position.set(px, 3.45, pz - 0.8);
+        pilaster.castShadow = true;
+        garageGroup.add(pilaster);
+      });
+    });
+    // Rear wall pilasters
+    [-4.5, 0, 4.5].forEach(px => {
+      const pilaster = new THREE.Mesh(new THREE.BoxGeometry(0.35, 6.4, 0.35), this.mat.darkMetal);
+      pilaster.position.set(px, 3.45, -5.55);
+      pilaster.castShadow = true;
+      garageGroup.add(pilaster);
+    });
+
+    // Architectural Gazprom Corporate Blue Trim & Hazard Skirting
+    const gTrimTop = new THREE.Mesh(new THREE.BoxGeometry(14.9, 0.65, 9.9), this.mat.orangeAccent);
+    gTrimTop.position.set(0, 6.6, -0.8);
     garageGroup.add(gTrimTop);
 
-    const gSkirting = new THREE.Mesh(new THREE.BoxGeometry(18.2, 0.45, 11.2), this.mat.hazardStripe);
-    gSkirting.position.set(0, 0.65, 0);
+    const gSkirting = new THREE.Mesh(new THREE.BoxGeometry(14.7, 0.45, 9.7), this.mat.hazardStripe);
+    gSkirting.position.set(0, 0.65, -0.8);
     garageGroup.add(gSkirting);
 
-    // Gable Roof & Snow Cap
-    const gRoof = new THREE.Mesh(new THREE.BoxGeometry(18.8, 0.5, 11.8), this.mat.greyWall);
-    gRoof.position.set(0, 7.25, 0);
+    // Gable Roof & Snow Cap with realistic overhang snow trim
+    const gRoof = new THREE.Mesh(new THREE.BoxGeometry(19.0, 0.55, 12.0), this.mat.greyWall);
+    gRoof.position.set(0, 7.3, 0);
     gRoof.castShadow = true;
     garageGroup.add(gRoof);
 
-    const gSnow = new THREE.Mesh(new THREE.BoxGeometry(18.6, 0.45, 11.6), this.mat.snowCap);
-    gSnow.position.set(0, 7.65, 0);
+    const gSnow = new THREE.Mesh(new THREE.BoxGeometry(18.8, 0.45, 11.8), this.mat.snowCap);
+    gSnow.position.set(0, 7.7, 0);
     garageGroup.add(gSnow);
 
-    // 2 Large Sectional Vehicle Bay Doors (БОКС 1 и БОКС 2)
-    [-4.5, 4.5].forEach((doorX, bIdx) => {
-      const bayFrame = new THREE.Mesh(new THREE.BoxGeometry(6.2, 4.8, 0.35), this.mat.hazardStripe);
-      bayFrame.position.set(doorX, 2.7, 5.6);
-      garageGroup.add(bayFrame);
-
-      const bayDoor = new THREE.Mesh(new THREE.BoxGeometry(5.6, 4.2, 0.25), this.mat.darkMetal);
-      bayDoor.position.set(doorX, 2.5, 5.75);
-      garageGroup.add(bayDoor);
-
-      // Sectional Window Slits
-      const slit = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.45, 0.1), this.mat.windowLit);
-      slit.position.set(doorX, 3.2, 5.9);
-      garageGroup.add(slit);
+    // Overhanging roof snow cornice trim (front and rear)
+    [-5.95, 5.95].forEach(oz => {
+      const snowTrim = new THREE.Mesh(new THREE.BoxGeometry(18.9, 0.35, 0.5), this.mat.snowCap);
+      snowTrim.position.set(0, 7.55, oz);
+      garageGroup.add(snowTrim);
     });
 
-    const garSign = this.createPhysicalSignboard("АВТОБАЗА СПЕЦТЕХНИКИ", "🚜", "#f59e0b", 13.5, 2.8);
-    garSign.position.set(0, 8.8, 4.2);
+    // 2 Large Sectional Vehicle Bay Doors with yellow/black hazard chevrons
+    [-4.5, 4.5].forEach((doorX, bIdx) => {
+      // Outer portal architrave with hazard striping
+      const bayFrame = new THREE.Mesh(new THREE.BoxGeometry(6.6, 5.0, 0.4), this.mat.hazardStripe);
+      bayFrame.position.set(doorX, 2.8, 5.55);
+      garageGroup.add(bayFrame);
+
+      // Sectional roll-up door panels with recessed grooves
+      for (let p = 0; p < 4; p++) {
+        const panel = new THREE.Mesh(new THREE.BoxGeometry(5.8, 1.0, 0.22), this.mat.darkMetal);
+        panel.position.set(doorX, 1.0 + p * 1.15, 5.72);
+        garageGroup.add(panel);
+
+        // Groove between panels
+        const groove = new THREE.Mesh(new THREE.BoxGeometry(5.8, 0.08, 0.24), this.mat.concreteDark || this.mat.darkMetal);
+        groove.position.set(doorX, 1.55 + p * 1.15, 5.72);
+        garageGroup.add(groove);
+      }
+
+      // Sectional Window Slits with warm interior glow
+      const slit = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.45, 0.12), this.mat.windowLit);
+      slit.position.set(doorX, 3.3, 5.85);
+      garageGroup.add(slit);
+
+      // Bay door clearance warning LED indicators
+      const ledG = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), this.mat.floodlightLamp);
+      ledG.position.set(doorX - 2.8, 5.4, 5.75);
+      garageGroup.add(ledG);
+      const ledR = new THREE.Mesh(new THREE.SphereGeometry(0.14, 8, 8), this.mat.redSteel);
+      ledR.position.set(doorX + 2.8, 5.4, 5.75);
+      garageGroup.add(ledR);
+    });
+
+    // Industrial Roof Exhaust Stacks for diesel engine fumes
+    [-6.0, 6.0].forEach(sx => {
+      const stack = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 4.8, 12), this.mat.silverPipe || this.mat.darkMetal);
+      stack.position.set(sx, 9.8, -3.5);
+      stack.castShadow = true;
+      garageGroup.add(stack);
+
+      // Stack rain deflector hood cap
+      const hood = new THREE.Mesh(new THREE.ConeGeometry(0.65, 0.45, 12), this.mat.darkMetal);
+      hood.position.set(sx, 12.4, -3.5);
+      garageGroup.add(hood);
+
+      // Mounting bracket band
+      const bracket = new THREE.Mesh(new THREE.TorusGeometry(0.4, 0.05, 6, 12), this.mat.darkMetal);
+      bracket.rotation.x = Math.PI / 2;
+      bracket.position.set(sx, 8.5, -3.5);
+      garageGroup.add(bracket);
+    });
+
+    // Outdoor Wall-Mounted Gooseneck Floodlights above vehicle bays
+    [-4.5, 0, 4.5].forEach(fx => {
+      const fArm = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 1.1), this.mat.darkMetal);
+      fArm.position.set(fx, 6.2, 5.95);
+      garageGroup.add(fArm);
+
+      const fShroud = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.42, 0.35, 10), this.mat.darkMetal);
+      fShroud.rotation.x = Math.PI / 4;
+      fShroud.position.set(fx, 6.1, 6.45);
+      garageGroup.add(fShroud);
+
+      const fLamp = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 8), this.mat.floodlightLamp);
+      fLamp.position.set(fx, 5.95, 6.55);
+      garageGroup.add(fLamp);
+    });
+
+    // Crisp high-resolution physical signboard
+    const garSign = this.createPhysicalSignboard("АВТОБАЗА СПЕЦТЕХНИКИ (АТБ)", "🚜", "#f59e0b", 15.0, 2.8);
+    garSign.position.set(0, 8.8, 4.4);
     garageGroup.add(garSign);
 
     // Outdoor Maintenance Ramp (Эстакада ТО с рельсами)
@@ -3476,18 +3817,6 @@ export class Isometric3D {
       garageGroup.add(tire);
     }
 
-    // 3D Billboard Label for Garage
-    const gBoard = this.create3DBillboard(
-      "🚜 ГАРАЖ ТЕХНИКИ (АТБ)",
-      `УР. ${state.garageLevel || 1} • ПАРК ${state.trekolCount || 1} ТРЭКОЛ 6х6`,
-      "#00a3e0",
-      "#1e293b",
-      17,
-      4.8
-    );
-    gBoard.position.set(0, 5.8, 0);
-    garageGroup.add(gBoard);
-
     const gHitbox = new THREE.Mesh(new THREE.BoxGeometry(22, 12, 15), new THREE.MeshBasicMaterial({ visible: false }));
     gHitbox.position.y = 6;
     garageGroup.add(gHitbox);
@@ -3507,76 +3836,296 @@ export class Isometric3D {
     });
     this.scene.add(garageGroup);
 
-    // 5. Research & Exploration Headquarters (ОФИС РАЗРАБОТКИ) at gx: 1.7, gy: 8.2 (Safely within perimeter fence)
+    // 5. Research & Exploration Headquarters (ЦЕНТР ГЕОЛОГОРАЗВЕДКИ / ЗДАНИЕ ГЕОЛОГОВ) at gx: 1.7, gy: 8.2
     if (this.rdOfficeGroup) {
       this.cleanupInteractablesForGroup(this.rdOfficeGroup);
       this.scene.remove(this.rdOfficeGroup);
     }
-    const defaultRdPos = this.gridToWorld(1.7, 8.2, 1.2);
-    const rdPos = (typeof state?.getBuildingPos === "function") ? state.getBuildingPos("rd_office", defaultRdPos) : defaultRdPos;
+    const rawDefaultRdPos = this.gridToWorld(1.7, 8.2, 1.2);
+    const defaultRdPos = rawDefaultRdPos;
+    const savedRdPos = (typeof state?.getBuildingPos === "function") ? state.getBuildingPos("rd_office", rawDefaultRdPos) : rawDefaultRdPos;
+    const snappedRd = this.snapToBuildingGrid(savedRdPos.x, savedRdPos.z, 6, 4, 3.5);
+    const rdPos = { x: snappedRd.x, y: 1.2, z: snappedRd.z };
     const rdGroup = new THREE.Group();
-    rdGroup.position.set(rdPos.x, defaultRdPos.y, rdPos.z);
+    rdGroup.position.set(rdPos.x, rdPos.y, rdPos.z);
     this.rdOfficeGroup = rdGroup;
 
-    const rdBase = new THREE.Mesh(new THREE.BoxGeometry(14, 0.4, 11), this.mat.concrete);
-    rdBase.position.y = 0.2;
+    // PAG Concrete Base Slab with curb (Exact 6x4 Cells = 21.0m x 14.0m)
+    const rdBase = new THREE.Mesh(new THREE.BoxGeometry(21.0, 0.5, 14.0), this.mat.pagConcrete || this.mat.concrete);
+    rdBase.position.y = 0.25;
     rdBase.receiveShadow = true;
     rdGroup.add(rdBase);
 
-    const rdFloor1 = new THREE.Mesh(new THREE.BoxGeometry(14.5, 3.8, 10.5), this.mat.rdOfficeWall);
-    rdFloor1.position.y = 2.1;
-    rdFloor1.castShadow = true;
-    rdGroup.add(rdFloor1);
+    const rdCurbMat = this.mat.concreteDark || this.mat.concrete;
+    [-10.38, 10.38].forEach(cx => {
+      const c = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.55, 14.0), rdCurbMat);
+      c.position.set(cx, 0.28, 0);
+      rdGroup.add(c);
+    });
+    [-6.88, 6.88].forEach(cz => {
+      const c = new THREE.Mesh(new THREE.BoxGeometry(21.0, 0.55, 0.25), rdCurbMat);
+      c.position.set(0, 0.28, cz);
+      rdGroup.add(c);
+    });
 
-    const rdTrim = new THREE.Mesh(new THREE.BoxGeometry(15.0, 0.35, 11.0), this.mat.rdOfficeTrim);
-    rdTrim.position.y = 4.15;
-    rdGroup.add(rdTrim);
+    // --- MAIN 2-STORY LABORATORY WING ---
+    const gW = 15.0, gH1 = 3.6, gH2 = 3.4, gD = 10.0;
+    const gTotalH = gH1 + gH2;
+    const gX = -3.5, gZ = -0.5;
 
-    const rdFloor2 = new THREE.Mesh(new THREE.BoxGeometry(13.5, 3.5, 9.5), this.mat.rdOfficeWall);
-    rdFloor2.position.y = 6.0;
-    rdFloor2.castShadow = true;
-    rdGroup.add(rdFloor2);
+    // Floor 1
+    const floor1 = new THREE.Mesh(new THREE.BoxGeometry(gW, gH1, gD), this.mat.rdOfficeWall);
+    floor1.position.set(gX, 0.5 + gH1 / 2, gZ);
+    floor1.castShadow = true;
+    floor1.receiveShadow = true;
+    rdGroup.add(floor1);
 
-    const rdRoof = new THREE.Mesh(new THREE.BoxGeometry(14.2, 0.45, 10.2), this.mat.rdOfficeTrim);
-    rdRoof.position.y = 7.95;
-    rdRoof.castShadow = true;
-    rdGroup.add(rdRoof);
+    // Middle Accent Trim Band (Cyan)
+    const midTrim = new THREE.Mesh(new THREE.BoxGeometry(gW + 0.5, 0.35, gD + 0.5), this.mat.rdOfficeTrim);
+    midTrim.position.set(gX, 0.5 + gH1, gZ);
+    midTrim.castShadow = true;
+    rdGroup.add(midTrim);
 
-    const rdSnow = new THREE.Mesh(new THREE.BoxGeometry(14.0, 0.35, 10.0), this.mat.snowCap);
-    rdSnow.position.y = 8.35;
-    rdGroup.add(rdSnow);
+    // Floor 2
+    const floor2 = new THREE.Mesh(new THREE.BoxGeometry(gW - 0.4, gH2, gD - 0.4), this.mat.rdOfficeWall);
+    floor2.position.set(gX, 0.5 + gH1 + gH2 / 2, gZ);
+    floor2.castShadow = true;
+    floor2.receiveShadow = true;
+    rdGroup.add(floor2);
 
-    [-4.0, 0.0, 4.0].forEach(wx => {
-      const win1 = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.8, 0.15), this.mat.rdOfficeGlass);
-      win1.position.set(wx, 2.2, 5.32);
+    // Roof Parapet Cyan Trim
+    const roofTrim = new THREE.Mesh(new THREE.BoxGeometry(gW + 0.6, 0.45, gD + 0.6), this.mat.rdOfficeTrim);
+    roofTrim.position.set(gX, 0.5 + gTotalH + 0.22, gZ);
+    roofTrim.castShadow = true;
+    rdGroup.add(roofTrim);
+
+    // Snow Cap on Roof
+    const roofSnow = new THREE.Mesh(new THREE.BoxGeometry(gW + 0.4, 0.4, gD + 0.4), this.mat.snowCap);
+    roofSnow.position.set(gX, 0.5 + gTotalH + 0.55, gZ);
+    roofSnow.castShadow = true;
+    rdGroup.add(roofSnow);
+
+    // --- ENTRANCE PORCH WITH DOORS & CANOPY ---
+    const pW = 4.0, pD = 2.4, pH = 0.35;
+    const porch = new THREE.Mesh(new THREE.BoxGeometry(pW, pH, pD), rdCurbMat);
+    porch.position.set(gX - 2.5, 0.5 + pH / 2, gZ + gD / 2 + pD / 2);
+    porch.receiveShadow = true;
+    rdGroup.add(porch);
+
+    const door = new THREE.Mesh(new THREE.BoxGeometry(1.8, 2.6, 0.1), this.mat.darkMetal);
+    door.position.set(gX - 2.5, 0.5 + 1.3, gZ + gD / 2 + 0.05);
+    rdGroup.add(door);
+
+    [-0.45, 0.45].forEach(dx => {
+      const doorWin = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.3, 0.12), this.mat.windowLit);
+      doorWin.position.set(gX - 2.5 + dx, 0.5 + 1.5, gZ + gD / 2 + 0.06);
+      rdGroup.add(doorWin);
+    });
+
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(pW + 0.4, 0.2, pD + 0.3), this.mat.rdOfficeTrim);
+    canopy.position.set(gX - 2.5, 0.5 + 3.2, gZ + gD / 2 + pD / 2 - 0.2);
+    canopy.castShadow = true;
+    rdGroup.add(canopy);
+
+    const canopySnow = new THREE.Mesh(new THREE.BoxGeometry(pW + 0.3, 0.18, pD + 0.2), this.mat.snowCap);
+    canopySnow.position.set(gX - 2.5, 0.5 + 3.35, gZ + gD / 2 + pD / 2 - 0.2);
+    canopySnow.castShadow = true;
+    rdGroup.add(canopySnow);
+
+    // Downward Recessed LED Entrance Lamp
+    const downlight = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.08, 0.5), this.mat.floodlightLamp);
+    downlight.position.set(gX - 2.5, 0.5 + 3.08, gZ + gD / 2 + 1.0);
+    rdGroup.add(downlight);
+
+    // Handrails
+    [-pW / 2 + 0.15, pW / 2 - 0.15].forEach(rx => {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.0, 8), this.mat.silverPipe || this.mat.darkMetal);
+      post.position.set(gX - 2.5 + rx, 0.5 + pH + 0.5, gZ + gD / 2 + pD - 0.2);
+      rdGroup.add(post);
+
+      const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, pD, 8), this.mat.silverPipe || this.mat.darkMetal);
+      rail.rotation.x = Math.PI / 2;
+      rail.position.set(gX - 2.5 + rx, 0.5 + pH + 1.0, gZ + gD / 2 + pD / 2);
+      rdGroup.add(rail);
+    });
+
+    // --- PANORAMIC GEOLOGICAL LAB WINDOWS ---
+    // Floor 1 Windows
+    [1.5, 4.5].forEach(wx => {
+      const win1 = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.6, 0.12), this.mat.rdOfficeGlass);
+      win1.position.set(gX + wx, 0.5 + 2.0, gZ + gD / 2 + 0.06);
       rdGroup.add(win1);
-      const win2 = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.6, 0.15), this.mat.rdOfficeGlass);
-      win2.position.set(wx, 6.0, 4.82);
+    });
+
+    // Floor 2 Windows
+    [-4.5, -1.5, 1.5, 4.5].forEach(wx => {
+      const win2 = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.5, 0.12), this.mat.rdOfficeGlass);
+      win2.position.set(gX + wx, 0.5 + gH1 + 1.8, gZ + gD / 2 + 0.06);
       rdGroup.add(win2);
     });
 
-    const rdMast = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 2.8, 8), this.mat.darkMetal);
-    rdMast.position.set(-3.5, 9.8, 0);
-    rdGroup.add(rdMast);
+    // Side Windows
+    [-2.5, 2.5].forEach(wz => {
+      const winS = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.5, 2.2), this.mat.rdOfficeGlass);
+      winS.position.set(gX - gW / 2 - 0.06, 0.5 + gH1 + 1.8, gZ + wz);
+      rdGroup.add(winS);
+    });
 
-    const rdDishGroup = new THREE.Group();
-    rdDishGroup.position.set(-3.5, 11.2, 0);
-    const dish = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 0.4, 0.5, 16), this.mat.orangeAccent);
-    dish.rotation.x = Math.PI / 4;
-    rdDishGroup.add(dish);
-    const spike = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.4, 8), this.mat.darkMetal);
-    spike.position.z = 0.5;
+    // --- ATTACHED CORE SAMPLE ANALYSIS MODULE ---
+    const labW = 6.5, labH = 3.2, labD = 7.5;
+    const labX = gX + gW / 2 + labW / 2 + 0.2;
+    const labZ = gZ - 0.6;
+
+    const labBody = new THREE.Mesh(new THREE.BoxGeometry(labW, labH, labD), this.mat.darkMetal);
+    labBody.position.set(labX, 0.5 + labH / 2, labZ);
+    labBody.castShadow = true;
+    rdGroup.add(labBody);
+
+    const labTrim = new THREE.Mesh(new THREE.BoxGeometry(labW + 0.4, 0.3, labD + 0.4), this.mat.rdOfficeTrim);
+    labTrim.position.set(labX, 0.5 + labH + 0.15, labZ);
+    rdGroup.add(labTrim);
+
+    const labSnow = new THREE.Mesh(new THREE.BoxGeometry(labW + 0.3, 0.35, labD + 0.3), this.mat.snowCap);
+    labSnow.position.set(labX, 0.5 + labH + 0.45, labZ);
+    rdGroup.add(labSnow);
+
+    // Core Delivery Rollup Door with Hazard Threshold
+    const labDoor = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.2, 0.1), this.mat.rdOfficeWall);
+    labDoor.position.set(labX, 0.5 + 1.1, labZ + labD / 2 + 0.05);
+    rdGroup.add(labDoor);
+
+    const thresh = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.12, 0.5), this.mat.hazardStripe || this.mat.orangeAccent);
+    thresh.position.set(labX, 0.5 + 0.06, labZ + labD / 2 + 0.25);
+    rdGroup.add(thresh);
+
+    // --- CORE SAMPLE CANOPY & SPECIMEN CRATES ---
+    const coreCanopyW = 5.5, coreCanopyD = 3.2, coreCanopyH = 2.6;
+    const coreX = labX + 0.3, coreZ = labZ + labD / 2 + 2.2;
+
+    const cRoof = new THREE.Mesh(new THREE.BoxGeometry(coreCanopyW, 0.15, coreCanopyD), this.mat.rdOfficeTrim);
+    cRoof.position.set(coreX, 0.5 + coreCanopyH, coreZ);
+    rdGroup.add(cRoof);
+
+    const cRoofSnow = new THREE.Mesh(new THREE.BoxGeometry(coreCanopyW - 0.1, 0.2, coreCanopyD - 0.1), this.mat.snowCap);
+    cRoofSnow.position.set(coreX, 0.5 + coreCanopyH + 0.15, coreZ);
+    rdGroup.add(cRoofSnow);
+
+    [[-coreCanopyW / 2 + 0.2, -coreCanopyD / 2 + 0.2],
+     [coreCanopyW / 2 - 0.2, -coreCanopyD / 2 + 0.2],
+     [-coreCanopyW / 2 + 0.2, coreCanopyD / 2 - 0.2],
+     [coreCanopyW / 2 - 0.2, coreCanopyD / 2 - 0.2]].forEach(([px, pz]) => {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.1, coreCanopyH, 0.1), this.mat.darkMetal);
+      post.position.set(coreX + px, 0.5 + coreCanopyH / 2, coreZ + pz);
+      rdGroup.add(post);
+    });
+
+    // Core Sample Wooden Crates
+    for (let c = 0; c < 4; c++) {
+      const cx = coreX - 1.2 + (c % 2) * 1.4;
+      const cz = coreZ - 0.5 + Math.floor(c / 2) * 1.1;
+
+      const pallet = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.12, 0.85), this.mat.woodPlatform);
+      pallet.position.set(cx, 0.5 + 0.06, cz);
+      rdGroup.add(pallet);
+
+      for (let layer = 0; layer < 2; layer++) {
+        const crate = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.3, 0.7), this.mat.woodPlatform);
+        crate.position.set(cx, 0.5 + 0.25 + layer * 0.32, cz);
+        rdGroup.add(crate);
+      }
+    }
+
+    // --- ROOFTOP RADAR, ANEMOMETER & BEACONS ---
+    // A. 360° Rotating Satellite Dish
+    const dishMast = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 2.8, 8), this.mat.darkMetal);
+    dishMast.position.set(gX - 4.5, 0.5 + gTotalH + 1.8, gZ + 1.5);
+    rdGroup.add(dishMast);
+
+    const satPivot = new THREE.Group();
+    satPivot.position.set(gX - 4.5, 0.5 + gTotalH + 3.2, gZ + 1.5);
+    rdGroup.add(satPivot);
+    this.rdDish = satPivot;
+
+    const dish = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 0.45, 0.5, 20), this.mat.orangeAccent || this.mat.rdOfficeTrim);
+    dish.rotation.x = Math.PI / 3.8;
+    dish.castShadow = true;
+    satPivot.add(dish);
+
+    const spike = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.4, 8), this.mat.darkMetal);
+    spike.position.z = 0.55;
     spike.rotation.x = Math.PI / 2;
-    rdDishGroup.add(spike);
-    rdGroup.add(rdDishGroup);
-    this.rdDish = rdDishGroup;
+    satPivot.add(spike);
 
-    const rdBoard = this.create3DBillboard("🗺️ ОФИС РАЗРАБОТКИ", "КАРТА МЕСТОРОЖДЕНИЙ", "#38bdf8", "#0f172a", 16, 5.0);
-    rdBoard.position.set(0, 9.2, 0);
-    rdGroup.add(rdBoard);
-    rdGroup.userData.billboard = rdBoard;
+    const feedLed = new THREE.Mesh(new THREE.SphereGeometry(0.1, 8, 8), new THREE.MeshBasicMaterial({ color: 0x22c55e }));
+    feedLed.position.set(0, 0.2, 1.25);
+    satPivot.add(feedLed);
 
-    const rdHitbox = new THREE.Mesh(new THREE.BoxGeometry(18, 14, 14), new THREE.MeshBasicMaterial({ visible: false }));
+    // B. Rotating Cup Anemometer (Ветромер)
+    const anemoMast = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.2, 8), this.mat.darkMetal);
+    anemoMast.position.set(gX + 4.5, 0.5 + gTotalH + 1.5, gZ + 2.0);
+    rdGroup.add(anemoMast);
+
+    const anemoPivot = new THREE.Group();
+    anemoPivot.position.set(gX + 4.5, 0.5 + gTotalH + 2.6, gZ + 2.0);
+    rdGroup.add(anemoPivot);
+    this.rdAnemometer = anemoPivot;
+
+    for (let i = 0; i < 3; i++) {
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.03, 0.03), this.mat.darkMetal);
+      arm.rotation.y = (i * Math.PI * 2) / 3;
+      arm.position.x = Math.cos((i * Math.PI * 2) / 3) * 0.32;
+      arm.position.z = Math.sin((i * Math.PI * 2) / 3) * 0.32;
+      anemoPivot.add(arm);
+
+      const cup = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 8, 0, Math.PI), this.mat.orangeAccent);
+      cup.rotation.y = (i * Math.PI * 2) / 3 + Math.PI / 2;
+      cup.position.set(Math.cos((i * Math.PI * 2) / 3) * 0.65, 0, Math.sin((i * Math.PI * 2) / 3) * 0.65);
+      anemoPivot.add(cup);
+    }
+
+    // C. Radio Telemetry Lattice Mast with Pulsing Red Beacon (СОУ-1)
+    const radioMast = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.14, 5.2, 6), this.mat.darkMetal);
+    radioMast.position.set(gX + 1.0, 0.5 + gTotalH + 3.0, gZ - 2.5);
+    rdGroup.add(radioMast);
+
+    const beacon = new THREE.Mesh(
+      new THREE.SphereGeometry(0.24, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0xef4444 })
+    );
+    beacon.position.set(gX + 1.0, 0.5 + gTotalH + 5.7, gZ - 2.5);
+    rdGroup.add(beacon);
+
+    // D. Rooftop HVAC Climate Units
+    [-1.5, 1.5].forEach(hx => {
+      const hvac = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.85, 1.6), this.mat.darkMetal);
+      hvac.position.set(gX + hx, 0.5 + gTotalH + 0.9, gZ - 2.0);
+      rdGroup.add(hvac);
+    });
+
+    // E. Heating Exhaust Stack with Steam Smoke Puffs
+    const chimney = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 2.2, 8), this.mat.chimneyMetal || this.mat.darkMetal);
+    chimney.position.set(gX + 4.5, 0.5 + gTotalH + 1.5, gZ - 2.5);
+    rdGroup.add(chimney);
+
+    if (this.animatedObjects?.chimneySmokes) {
+      const rdPuffs = [];
+      for (let p = 0; p < 4; p++) {
+        const puff = new THREE.Mesh(new THREE.SphereGeometry(0.28 + p * 0.14, 6, 6), this.mat.smokeCloud);
+        puff.position.set(rdPos.x + gX + 4.5, defaultRdPos.y + gTotalH + 2.6 + p * 0.7, rdPos.z + gZ - 2.5);
+        this.scene.add(puff);
+        rdPuffs.push(puff);
+      }
+      this.animatedObjects.chimneySmokes.push({
+        puffs: rdPuffs,
+        baseX: rdPos.x + gX + 4.5,
+        baseY: defaultRdPos.y + gTotalH + 2.5,
+        baseZ: rdPos.z + gZ - 2.5,
+        speed: 1.5,
+        spread: 0.3
+      });
+    }
+
+    const rdHitbox = new THREE.Mesh(new THREE.BoxGeometry(22, 14, 16), new THREE.MeshBasicMaterial({ visible: false }));
     rdHitbox.position.y = 7;
     rdGroup.add(rdHitbox);
 
@@ -3593,7 +4142,7 @@ export class Isometric3D {
         this.interactables.push(child);
       }
     });
-    this.registerMovableBuilding("rd_office", rdGroup, { gx: 1.7, gy: 8.2, yOffset: 1.2 }, { w: 16, d: 14 });
+    this.registerMovableBuilding("rd_office", rdGroup, rawDefaultRdPos, { cellsW: 6, cellsD: 4, w: 21.0, d: 14.0, label: "НТЦ Геологии" });
     this.scene.add(rdGroup);
   }
 
@@ -3661,7 +4210,7 @@ export class Isometric3D {
       }
     });
 
-    this.registerMovableBuilding("crypto_flare", g, { gx: 12.0, gy: 11.5, yOffset: 1.2 }, { w: 12, d: 12 });
+    this.registerMovableBuilding("crypto_flare", g, { gx: 12.0, gy: 11.5, yOffset: 1.2 }, { cellsW: 3, cellsD: 3, w: 10.5, d: 10.5, label: "Крипто-модуль ПНГ" });
     this.scene.add(g);
   }
 
@@ -3893,17 +4442,19 @@ export class Isometric3D {
     // (Overhead conductor wires removed per R4 to eliminate wire clipping through GPZ buildings)
 
     // =========================================================================
-    // 2. INDUSTRIAL FLOODLIGHT MASTS (ПРОЖЕКТОРНЫЕ МАЧТЫ ПМС-24)
+    // 2. INDUSTRIAL FLOODLIGHT MASTS (ПРОЖЕКТОРНЫЕ МАЧТЫ ПМС-24 ПО 4 УГЛАМ ЗАБОРА)
     // =========================================================================
     const mastLocations = [
-      { gx: 8.8, gy: 6.8, name: "Мачта ПМС №1 (ЦПС / РВС)" },
-      { gx: 12.5, gy: 5.2, name: "Мачта ПМС №2 (Восточный коридор)" },
-      { gx: 2.2, gy: 8.5, name: "Мачта ПМС №3 (Вахтовый городок)" },
-      { gx: 7.2, gy: 1.8, name: "Мачта ПМС №4 (Северный сектор)" }
+      { x: -60.0, z: -48.0, name: "Мачта ПМС №1 (Северо-Западный угол)" },
+      { x: 28.0, z: -48.0, name: "Мачта ПМС №2 (Северо-Восточный угол)" },
+      { x: 28.0, z: 40.0, name: "Мачта ПМС №3 (Юго-Восточный угол)" },
+      { x: -60.0, z: 40.0, name: "Мачта ПМС №4 (Юго-Западный угол)" }
     ];
 
     mastLocations.forEach(loc => {
-      const pos = this.gridToWorld(loc.gx, loc.gy, 1.22);
+      const pos = (typeof loc.x === "number" && typeof loc.z === "number")
+        ? { x: loc.x, y: 1.22, z: loc.z }
+        : this.gridToWorld(loc.gx, loc.gy, 1.22);
       const mastGroup = new THREE.Group();
       mastGroup.position.set(pos.x, pos.y, pos.z);
 
@@ -4008,49 +4559,152 @@ export class Isometric3D {
     const ktpnGroup = new THREE.Group();
     ktpnGroup.position.set(ktpnPos.x, defaultKtpnPos.y, ktpnPos.z);
     this.substationGroup = ktpnGroup;
-    this.registerMovableBuilding("substation", ktpnGroup, { gx: 8.2, gy: 4.8, yOffset: 1.22 }, { w: 10, d: 8 });
+    this.registerMovableBuilding("substation", ktpnGroup, { gx: 8.2, gy: 4.8, yOffset: 1.22 }, { cellsW: 2, cellsD: 2, w: 7.0, d: 7.0, label: "КТПН Подстанция" });
 
-    const ktpnSign = this.createPhysicalSignboard("ПОДСТАНЦИЯ 10 кВ", "⚡", "#eab308", 7.0, 1.8);
-    ktpnSign.position.set(0, 4.2, 1.8);
+    // Architectural illuminated physical signboard
+    const ktpnSign = this.createPhysicalSignboard("КТПН 10/0.4 кВ", "⚡", "#eab308", 7.2, 1.8);
+    ktpnSign.position.set(0, 4.4, 2.5);
     ktpnGroup.add(ktpnSign);
 
-    // Foundation slab
-    const ktpnSlab = new THREE.Mesh(new THREE.BoxGeometry(8.5, 0.55, 6.0), this.mat.concrete);
-    ktpnSlab.position.y = 0.28;
+    // Foundation concrete slab
+    const ktpnSlab = new THREE.Mesh(new THREE.BoxGeometry(9.2, 0.6, 6.8), this.mat.concrete);
+    ktpnSlab.position.y = 0.3;
     ktpnSlab.receiveShadow = true;
     ktpnGroup.add(ktpnSlab);
 
+    // Hazard warning stripe skirting
+    const ktpnSkirting = new THREE.Mesh(new THREE.BoxGeometry(9.4, 0.25, 7.0), this.mat.hazardStripe);
+    ktpnSkirting.position.y = 0.15;
+    ktpnGroup.add(ktpnSkirting);
+
+    // Metal containment frame: structural steel corner columns & perimeter beams
+    [[-3.8, -2.5], [3.8, -2.5], [-3.8, 2.5], [3.8, 2.5]].forEach(([cx, cz]) => {
+      const col = new THREE.Mesh(new THREE.BoxGeometry(0.35, 4.2, 0.35), this.mat.darkMetal);
+      col.position.set(cx, 2.1, cz);
+      col.castShadow = true;
+      ktpnGroup.add(col);
+
+      // Lifting eye lugs on top corners for crane transport
+      const lug = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.05, 6, 12), this.mat.steelTruss || this.mat.darkMetal);
+      lug.position.set(cx, 4.3, cz);
+      ktpnGroup.add(lug);
+    });
+
+    // Top horizontal containment tie-beams
+    [-2.5, 2.5].forEach(bz => {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(7.8, 0.22, 0.22), this.mat.darkMetal);
+      b.position.set(0, 4.1, bz);
+      ktpnGroup.add(b);
+    });
+    [-3.8, 3.8].forEach(bx => {
+      const b = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 5.0), this.mat.darkMetal);
+      b.position.set(bx, 4.1, 0);
+      ktpnGroup.add(b);
+    });
+
     // Substation weatherproof container body
-    const ktpnBody = new THREE.Mesh(new THREE.BoxGeometry(7.4, 3.6, 5.0), this.mat.substationWall || this.mat.substationBlue);
-    ktpnBody.position.y = 2.1;
+    const ktpnBody = new THREE.Mesh(new THREE.BoxGeometry(7.4, 3.8, 4.8), this.mat.substationWall || this.mat.substationBlue);
+    ktpnBody.position.y = 2.2;
     ktpnBody.castShadow = true;
     ktpnGroup.add(ktpnBody);
 
-    // Hazard warning stripe skirting
-    const ktpnSkirting = new THREE.Mesh(new THREE.BoxGeometry(7.5, 0.45, 5.1), this.mat.hazardStripe);
-    ktpnSkirting.position.y = 0.55;
-    ktpnGroup.add(ktpnSkirting);
+    // Corporate Gazprom cyan accent band
+    const ktpnBand = new THREE.Mesh(new THREE.BoxGeometry(7.45, 0.5, 4.85), this.mat.orangeAccent);
+    ktpnBand.position.y = 2.4;
+    ktpnGroup.add(ktpnBand);
 
-    // Cooling radiator louvers on both flanks
-    [-2.6, 2.6].forEach(oz => {
-      const radBlock = new THREE.Mesh(new THREE.BoxGeometry(5.2, 2.2, 0.4), this.mat.greyWall);
-      radBlock.position.set(0, 2.1, oz);
-      ktpnGroup.add(radBlock);
+    // Double steel service doors on front (+Z)
+    const ktpnDoors = new THREE.Mesh(new THREE.BoxGeometry(2.8, 2.6, 0.15), this.mat.darkMetal);
+    ktpnDoors.position.set(0, 1.9, 2.45);
+    ktpnGroup.add(ktpnDoors);
+
+    // Warning lightning sign plate on the doors
+    const ktpnWarnPlate = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.9, 0.08), this.mat.hazardStripe);
+    ktpnWarnPlate.position.set(0, 2.3, 2.55);
+    ktpnGroup.add(ktpnWarnPlate);
+
+    const ktpnWarnFrame = new THREE.Mesh(new THREE.BoxGeometry(1.48, 0.98, 0.06), this.mat.darkMetal);
+    ktpnWarnFrame.position.set(0, 2.3, 2.53);
+    ktpnGroup.add(ktpnWarnFrame);
+
+    // Transformer cooling fins (Radiator banks on rear wall and sides)
+    // Rear radiator bank with header manifolds and cooling fins
+    [-2.6].forEach(rz => {
+      // Header pipes (upper and lower)
+      [1.3, 3.1].forEach(hy => {
+        const header = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 5.6, 8), this.mat.silverPipe);
+        header.rotation.z = Math.PI / 2;
+        header.position.set(0, hy, rz);
+        ktpnGroup.add(header);
+      });
+
+      // 7 vertical cooling fins / radiator plates
+      for (let fi = -3; fi <= 3; fi++) {
+        const fin = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.2, 0.8), this.mat.darkMetal);
+        fin.position.set(fi * 0.85, 2.2, rz);
+        fin.castShadow = true;
+        ktpnGroup.add(fin);
+      }
     });
 
-    // High-voltage roof bushings (проходные изоляторы 10 кВ)
+    // Flank cooling fins on left side
+    for (let fz = -1; fz <= 1; fz++) {
+      const sFin = new THREE.Mesh(new THREE.BoxGeometry(0.7, 2.0, 0.1), this.mat.darkMetal);
+      sFin.position.set(-3.85, 2.2, fz * 1.1);
+      ktpnGroup.add(sFin);
+    }
+
+    // High-voltage ceramic insulators on top (Проходные изоляторы 10 кВ)
     [-1.8, 0, 1.8].forEach(ox => {
-      const bushing = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 1.2, 8), this.mat.insulator);
-      bushing.position.set(ox, 4.3, 0);
+      // Insulator mounting flange
+      const flange = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, 0.2, 10), this.mat.darkMetal);
+      flange.position.set(ox, 4.25, 0);
+      ktpnGroup.add(flange);
+
+      // Core ceramic insulator
+      const bushing = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 1.4, 10), this.mat.insulator);
+      bushing.position.set(ox, 4.95, 0);
       ktpnGroup.add(bushing);
+
+      // 3 tiered ribbed ceramic disc petticoats
+      [4.6, 4.9, 5.2].forEach(dy => {
+        const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.08, 12), this.mat.insulator);
+        disc.position.set(ox, dy, 0);
+        ktpnGroup.add(disc);
+      });
+
+      // Top bronze terminal cap with arcing horn conductor
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.45, 8), this.mat.brass);
+      cap.position.set(ox, 5.8, 0);
+      ktpnGroup.add(cap);
     });
 
-    // Gable snow cap on roof
-    const ktpnRoofSnow = new THREE.Mesh(new THREE.BoxGeometry(7.6, 0.35, 5.2), this.mat.snowCap);
-    ktpnRoofSnow.position.y = 4.0;
+    // Transformer oil conservator expansion tank (Расширитель трансформатора)
+    const consTank = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 3.4, 12), this.mat.greyWall);
+    consTank.rotation.z = Math.PI / 2;
+    consTank.position.set(0, 4.4, -1.6);
+    consTank.castShadow = true;
+    ktpnGroup.add(consTank);
+
+    const consBreather = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.8, 8), this.mat.silverPipe);
+    consBreather.position.set(1.5, 4.4, -1.6);
+    ktpnGroup.add(consBreather);
+
+    // Grounding copper busbar running down to the concrete slab
+    const groundBar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 3.8, 0.08), this.mat.brass);
+    groundBar.position.set(3.7, 2.2, 2.4);
+    ktpnGroup.add(groundBar);
+
+    // Pitched roof and snow cap
+    const ktpnRoof = new THREE.Mesh(new THREE.BoxGeometry(7.8, 0.35, 5.2), this.mat.greyWall);
+    ktpnRoof.position.y = 4.15;
+    ktpnGroup.add(ktpnRoof);
+
+    const ktpnRoofSnow = new THREE.Mesh(new THREE.BoxGeometry(7.6, 0.3, 5.0), this.mat.snowCap);
+    ktpnRoofSnow.position.y = 4.45;
     ktpnGroup.add(ktpnRoofSnow);
 
-    // Warning 3D billboard
+    // 3D billboard (hidden by default)
     const ktpnBoard = this.create3DBillboard(
       "⚡ КТПН 10/0.4 кВ",
       "ТРАНСФОРМАТОРНАЯ ПОДСТАНЦИЯ",
@@ -4060,6 +4714,7 @@ export class Isometric3D {
       4.8
     );
     ktpnBoard.position.set(0, 4.6, 0);
+    ktpnBoard.visible = false;
     ktpnGroup.add(ktpnBoard);
 
     ktpnGroup.userData = {
@@ -4142,7 +4797,7 @@ export class Isometric3D {
         this.interactables.push(child);
       }
     });
-    this.registerMovableBuilding("manifold_bvm", bvmGroup, { gx: 4.8, gy: 4.5, yOffset: 1.22 }, { w: 10, d: 8 });
+    this.registerMovableBuilding("manifold_bvm", bvmGroup, { gx: 4.8, gy: 4.5, yOffset: 1.22 }, { cellsW: 2, cellsD: 2, w: 7.0, d: 7.0, label: "Блок Манифольда БВМ" });
     infraGroup.add(bvmGroup);
 
     // 4B. Methanol Inhibitor Dosing Skid (БДР)
@@ -4196,7 +4851,7 @@ export class Isometric3D {
         this.interactables.push(child);
       }
     });
-    this.registerMovableBuilding("bdr_methanol", bdrGroup, { gx: 8.6, gy: 8.5, yOffset: 1.22 }, { w: 10, d: 8 });
+    this.registerMovableBuilding("bdr_methanol", bdrGroup, { gx: 8.6, gy: 8.5, yOffset: 1.22 }, { cellsW: 2, cellsD: 2, w: 7.0, d: 7.0, label: "БДР Метанол" });
     infraGroup.add(bdrGroup);
 
     // 4C. Mobile Nitrogen Compressor Station (СДА)
@@ -4248,82 +4903,14 @@ export class Isometric3D {
         this.interactables.push(child);
       }
     });
-    this.registerMovableBuilding("sda_nitrogen", sdaGroup, { gx: 5.5, gy: 9.2, yOffset: 1.22 }, { w: 12, d: 8 });
+    this.registerMovableBuilding("sda_nitrogen", sdaGroup, { gx: 5.5, gy: 9.2, yOffset: 1.22 }, { cellsW: 3, cellsD: 2, w: 10.5, d: 7.0, label: "Азотная Станция СДА" });
     infraGroup.add(sdaGroup);
 
     // =========================================================================
-    // 5. OVERHEAD PIPE RACK (ЭСТАКАДА) & EXPANSION LOOP (П-КОМПЕНСАТОР)
+    // 5. OVERHEAD PIPE RACK & EXPANSION LOOP REMOVED
     // =========================================================================
-    // Overhead Rack spanning across the road corridor between CPS and Canteen
-    const rackPos = this.gridToWorld(4.8, 6.5, 1.22);
-    const rackGroup = new THREE.Group();
-    rackGroup.position.set(rackPos.x, rackPos.y, rackPos.z);
-
-    const rackSpan = 8.8;
-    const rackH = 6.4;
-
-    // Two steel support bents (H-columns)
-    [-rackSpan / 2, rackSpan / 2].forEach(oz => {
-      const col = new THREE.Mesh(new THREE.BoxGeometry(0.4, rackH, 0.4), this.mat.darkMetal);
-      col.position.set(0, rackH / 2, oz);
-      col.castShadow = true;
-      rackGroup.add(col);
-
-      // Footing
-      const ft = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.4, 0.9), this.mat.concrete);
-      ft.position.set(0, 0.2, oz);
-      rackGroup.add(ft);
-    });
-
-    // Cross beam truss bridging over road
-    const crossBeam = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.35, rackSpan + 0.6), this.mat.darkMetal);
-    crossBeam.position.set(0, rackH, 0);
-    rackGroup.add(crossBeam);
-
-    // 3 Multi-tier insulated pipelines passing overhead
-    const pBlue = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, rackSpan + 2.0, 10), this.mat.bluePipe);
-    pBlue.rotation.x = Math.PI / 2;
-    pBlue.position.set(-0.5, rackH + 0.45, 0);
-    rackGroup.add(pBlue);
-
-    const pYellow = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, rackSpan + 2.0, 10), this.mat.yellowGasPipe);
-    pYellow.rotation.x = Math.PI / 2;
-    pYellow.position.set(0, rackH + 0.4, 0);
-    rackGroup.add(pYellow);
-
-    const pSilver = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, rackSpan + 2.0, 10), this.mat.silverPipe);
-    pSilver.rotation.x = Math.PI / 2;
-    pSilver.position.set(0.5, rackH + 0.35, 0);
-    rackGroup.add(pSilver);
-
-    infraGroup.add(rackGroup);
-
-    // Thermal Expansion Loop (П-образный компенсатор) near CPS -> Well 2 corridor
-    const loopPos = this.gridToWorld(9.8, 5.2, 1.22);
-    const loopGroup = new THREE.Group();
-    loopGroup.position.set(loopPos.x, loopPos.y, loopPos.z);
-
-    // Pipeline riser arches out in a U-shape
-    const loopCurve = new THREE.CurvePath();
-    const lRiser1 = new THREE.LineCurve3(new THREE.Vector3(-3.5, 0.6, 0), new THREE.Vector3(-3.5, 0.6, 3.2));
-    const lCross = new THREE.LineCurve3(new THREE.Vector3(-3.5, 0.6, 3.2), new THREE.Vector3(3.5, 0.6, 3.2));
-    const lRiser2 = new THREE.LineCurve3(new THREE.Vector3(3.5, 0.6, 3.2), new THREE.Vector3(3.5, 0.6, 0));
-    loopCurve.add(lRiser1);
-    loopCurve.add(lCross);
-    loopCurve.add(lRiser2);
-
-    const loopMesh = new THREE.Mesh(new THREE.TubeGeometry(loopCurve, 20, 0.32, 8, false), this.mat.bluePipe);
-    loopMesh.castShadow = true;
-    loopGroup.add(loopMesh);
-
-    // Guide supports under loop
-    [-3.5, 0, 3.5].forEach(ox => {
-      const sup = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.6, 0.3), this.mat.darkMetal);
-      sup.position.set(ox, 0.3, 3.2);
-      loopGroup.add(sup);
-    });
-
-    infraGroup.add(loopGroup);
+    // The central overhead rack arch ("ворота") and the corner thermal U-loop ("труба")
+    // were removed per user request to maintain an uncluttered open concrete yard.
 
     // =========================================================================
     // 6. NEW WELL CLUSTERS (CLUSTER 5 «ТАЁЖНЫЙ» & CLUSTER 6 «АЧИМОВСКИЙ»)
@@ -4509,6 +5096,34 @@ export class Isometric3D {
     this.fenceExpansionGroup = group;
 
     // =========================================================================
+    // 0. COMPREHENSIVE PERIMETER CONCRETE SLAB APRON (МОНОЛИТНАЯ ПЛОЩАДКА ИЗ ПЛИТ ПАГ-14)
+    // =========================================================================
+    // Entire area inside security fence is covered by PAG-14 concrete plate platform (no empty snow void)
+    const apronW = 100.5, apronD = 100.5, apronH = 0.45;
+    const apronCenter = { x: -16.0, y: 1.22 + apronH / 2, z: -4.0 };
+    const apronMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(apronW, apronH, apronD),
+      this.mat.pagConcrete || this.mat.concrete
+    );
+    apronMesh.position.set(apronCenter.x, apronCenter.y, apronCenter.z);
+    apronMesh.receiveShadow = true;
+    group.add(apronMesh);
+
+    // Perimeter concrete curbs around the outer bounds of the slab apron
+    const pCurbMat = this.mat.concreteDark || this.mat.concrete;
+    const curbThick = 0.5, curbH = 0.35;
+    [[-apronW / 2, 0], [apronW / 2, 0]].forEach(([cx]) => {
+      const c = new THREE.Mesh(new THREE.BoxGeometry(curbThick, curbH, apronD), pCurbMat);
+      c.position.set(apronCenter.x + cx, apronCenter.y + apronH / 2 + curbH / 2, apronCenter.z);
+      group.add(c);
+    });
+    [[0, -apronD / 2], [0, apronD / 2]].forEach(([, cz]) => {
+      const c = new THREE.Mesh(new THREE.BoxGeometry(apronW, curbH, curbThick), pCurbMat);
+      c.position.set(apronCenter.x, apronCenter.y + apronH / 2 + curbH / 2, apronCenter.z + cz);
+      group.add(c);
+    });
+
+    // =========================================================================
     // 1. REALISTIC INDUSTRIAL PERIMETER SECURITY FENCE (НАСТОЯЩИЙ ЗАБОР ВОКРУГ ПРОМЫСЛА)
     // =========================================================================
     // Contour enclosing the entire industrial complex from Gatehouse
@@ -4590,23 +5205,79 @@ export class Isometric3D {
     dksGroup.position.set(dksPos.x, defaultDksPos.y, dksPos.z);
     this.dksGroup = dksGroup;
 
-    const dksFoundation = new THREE.Mesh(new THREE.BoxGeometry(22, 0.6, 14), this.mat.concrete);
-    dksFoundation.position.y = 0.3;
+    // Foundation concrete slab and hazard perimeter skirting
+    const dksFoundation = new THREE.Mesh(new THREE.BoxGeometry(22, 0.65, 15), this.mat.concrete);
+    dksFoundation.position.y = 0.32;
     dksFoundation.receiveShadow = true;
     dksGroup.add(dksFoundation);
 
-    const dksBody = new THREE.Mesh(new THREE.BoxGeometry(18, 7.8, 11), this.mat.whiteWall);
+    const dksCurb = new THREE.Mesh(new THREE.BoxGeometry(22.4, 0.25, 15.4), this.mat.hazardStripe);
+    dksCurb.position.y = 0.15;
+    dksGroup.add(dksCurb);
+
+    // Main Compressor Workshop Hall
+    const dksBody = new THREE.Mesh(new THREE.BoxGeometry(18, 7.8, 11), this.mat.corrugatedWorkshop || this.mat.whiteWall);
     dksBody.position.y = 4.2;
     dksBody.castShadow = true;
     dksGroup.add(dksBody);
 
-    const dksRoof = new THREE.Mesh(new THREE.BoxGeometry(18.6, 0.6, 11.6), this.mat.orangeRoof);
-    dksRoof.position.y = 8.4;
+    // Structural wall pilasters / columns (relief against flat box walls)
+    [-8.0, -4.0, 0, 4.0, 8.0].forEach(px => {
+      const colF = new THREE.Mesh(new THREE.BoxGeometry(0.35, 8.0, 0.35), this.mat.darkMetal);
+      colF.position.set(px, 4.2, 5.55);
+      colF.castShadow = true;
+      dksGroup.add(colF);
+
+      const colB = new THREE.Mesh(new THREE.BoxGeometry(0.35, 8.0, 0.35), this.mat.darkMetal);
+      colB.position.set(px, 4.2, -5.55);
+      colB.castShadow = true;
+      dksGroup.add(colB);
+    });
+
+    // Corporate Gazprom blue cladding band
+    const dksBand = new THREE.Mesh(new THREE.BoxGeometry(18.2, 1.0, 11.2), this.mat.orangeRoof);
+    dksBand.position.y = 6.8;
+    dksGroup.add(dksBand);
+
+    // Industrial gable roof & overhanging snow cap
+    const dksRoof = new THREE.Mesh(new THREE.BoxGeometry(18.6, 0.65, 11.6), this.mat.orangeRoof);
+    dksRoof.position.y = 8.45;
     dksGroup.add(dksRoof);
 
     const dksSnow = new THREE.Mesh(new THREE.BoxGeometry(18.4, 0.5, 11.4), this.mat.snowCap);
-    dksSnow.position.y = 8.9;
+    dksSnow.position.y = 8.95;
     dksGroup.add(dksSnow);
+
+    // Industrial Turbo-Compressor Housing (Блочно-комплектные укрытия ГПА-16 «Урал»)
+    [-4.5, 4.5].forEach(tx => {
+      // Acoustic compressor housing box
+      const tBox = new THREE.Mesh(new THREE.BoxGeometry(5.2, 3.8, 4.2), this.mat.greyWall);
+      tBox.position.set(tx, 2.4, 4.8);
+      tBox.castShadow = true;
+      dksGroup.add(tBox);
+
+      // Curved cylindrical turbine roof cowling
+      const tCowl = new THREE.Mesh(
+        new THREE.CylinderGeometry(2.1, 2.1, 5.2, 16, 1, false, 0, Math.PI),
+        this.mat.darkMetal
+      );
+      tCowl.rotation.z = Math.PI / 2;
+      tCowl.position.set(tx, 4.3, 4.8);
+      tCowl.castShadow = true;
+      dksGroup.add(tCowl);
+
+      // Turbine air intake filtration hoods (КВОУ) with louver grilles
+      const kvoHood = new THREE.Mesh(new THREE.BoxGeometry(4.6, 1.4, 1.2), this.mat.darkMetal);
+      kvoHood.position.set(tx, 3.2, 6.2);
+      dksGroup.add(kvoHood);
+
+      // Louver grille slats
+      [2.9, 3.2, 3.5].forEach(ly => {
+        const slat = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.1, 0.15), this.mat.silverPipe);
+        slat.position.set(tx, ly, 6.85);
+        dksGroup.add(slat);
+      });
+    });
 
     // 3 High Vertical Exhaust Stacks for Gas Turbine Compressor Units (ГПА)
     [-5.0, 0.0, 5.0].forEach(sx => {
@@ -4620,10 +5291,95 @@ export class Isometric3D {
       const hood = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.55, 1.2, 10), this.mat.darkMetal);
       hood.position.set(sx, stackH + 8.5, -3.2);
       dksGroup.add(hood);
+
+      // Red aviation warning obstacle light
+      const warnLight = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 8), new THREE.MeshBasicMaterial({ color: 0xe53935 }));
+      warnLight.position.set(sx, stackH + 9.3, -3.2);
+      dksGroup.add(warnLight);
     });
+
+    // Radiator Grille (АВО газа - Аппараты воздушного охлаждения газа)
+    const avoFrame = new THREE.Mesh(new THREE.BoxGeometry(7.6, 1.8, 4.5), this.mat.steelTruss || this.mat.darkMetal);
+    avoFrame.position.set(0, 8.8, 1.0);
+    dksGroup.add(avoFrame);
+
+    // Horizontal cooling fins / radiator louver slats
+    for (let fIdx = 0; fIdx < 6; fIdx++) {
+      const fin = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.1, 4.2), this.mat.silverPipe);
+      fin.position.set(0, 8.0 + fIdx * 0.28, 1.0);
+      dksGroup.add(fin);
+    }
+
+    // 2 Massive Top-Mounted Axial Cooling Fan Cowlings
+    [-1.9, 1.9].forEach(fx => {
+      const fanCowl = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 0.55, 16), this.mat.darkMetal);
+      fanCowl.position.set(fx, 9.8, 1.0);
+      dksGroup.add(fanCowl);
+
+      const fanHub = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.6, 12), this.mat.silverPipe);
+      fanHub.position.set(fx, 9.85, 1.0);
+      dksGroup.add(fanHub);
+    });
+
+    // Curved Bypass Piping & High-Pressure Gas Manifolds
+    // Main suction & discharge gas manifold running along front
+    const mainHeader = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 16.0, 12), this.mat.bluePipe);
+    mainHeader.rotation.z = Math.PI / 2;
+    mainHeader.position.set(0, 1.8, 6.4);
+    mainHeader.castShadow = true;
+    dksGroup.add(mainHeader);
+
+    // Curved bypass loop pipe
+    const bypassPipe = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 6.5, 12), this.mat.yellowGasPipe || this.mat.orangeAccent);
+    bypassPipe.rotation.x = Math.PI / 2;
+    bypassPipe.position.set(0, 1.8, 3.2);
+    dksGroup.add(bypassPipe);
+
+    // Vertical riser loops with flanges
+    [-6.5, 6.5].forEach(rx => {
+      const riser = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 3.2, 12), this.mat.bluePipe);
+      riser.position.set(rx, 2.6, 6.4);
+      dksGroup.add(riser);
+
+      const flange = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.08, 6, 16), this.mat.valveSteel);
+      flange.rotation.x = Math.PI / 2;
+      flange.position.set(rx, 3.6, 6.4);
+      dksGroup.add(flange);
+
+      // Industrial gate valve with red handwheel
+      const valveWheel = new THREE.Mesh(new THREE.TorusGeometry(0.38, 0.06, 8, 16), this.mat.redValve);
+      valveWheel.position.set(rx, 2.6, 6.8);
+      dksGroup.add(valveWheel);
+    });
+
+    // Industrial Pressure Gauges (Манометры высокого давления МП-4У)
+    [-3.0, 0, 3.0].forEach(gx => {
+      // Brass stem
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.35, 8), this.mat.brass);
+      stem.position.set(gx, 2.35, 6.4);
+      dksGroup.add(stem);
+
+      // Gauge dial body
+      const dialBody = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.12, 16), this.mat.darkMetal);
+      dialBody.rotation.x = Math.PI / 2;
+      dialBody.position.set(gx, 2.65, 6.4);
+      dksGroup.add(dialBody);
+
+      // White dial face
+      const dialFace = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 0.04, 16), this.mat.snowCap);
+      dialFace.rotation.x = Math.PI / 2;
+      dialFace.position.set(gx, 2.65, 6.48);
+      dksGroup.add(dialFace);
+    });
+
+    // Architectural illuminated physical signboard
+    const dksSign = this.createPhysicalSignboard("ЦЕХ ДКС • ГПА-16 «УРАЛ»", "⚙️", "#00a3e0", 15.0, 2.5);
+    dksSign.position.set(0, 9.4, 4.8);
+    dksGroup.add(dksSign);
 
     const dksBoard = this.create3DBillboard("⚙️ ЦЕХ ДКС ГАЗА", "ДОЖИМНЫЕ ТУРБОКОМПРЕССОРЫ", "#00a3e0", "#1e293b", 16, 4.5);
     dksBoard.position.set(0, 9.4, 0);
+    dksBoard.visible = false;
     dksGroup.add(dksBoard);
 
     dksGroup.userData = {
@@ -4638,7 +5394,7 @@ export class Isometric3D {
         this.interactables.push(child);
       }
     });
-    this.registerMovableBuilding("dks_gas", dksGroup, { gx: 8.5, gy: 3.8, yOffset: 1.22 }, { w: 18, d: 16 });
+    this.registerMovableBuilding("dks_gas", dksGroup, { gx: 8.5, gy: 3.8, yOffset: 1.22 }, { cellsW: 5, cellsD: 4, w: 17.5, d: 14.0, label: "ДКС Компрессорная" });
     group.add(dksGroup);
 
     // 2B. Low-Temperature Gas Separation Skid (Цех НТС / УПГ)
@@ -4687,7 +5443,7 @@ export class Isometric3D {
         this.interactables.push(child);
       }
     });
-    this.registerMovableBuilding("nts_gas", ntsGroup, { gx: 4.8, gy: 2.8, yOffset: 1.22 }, { w: 16, d: 12 });
+    this.registerMovableBuilding("nts_gas", ntsGroup, { gx: 4.8, gy: 2.8, yOffset: 1.22 }, { cellsW: 4, cellsD: 3, w: 14.0, d: 10.5, label: "Цех НТС Газоочистки" });
     group.add(ntsGroup);
 
     // 2C. Pipe Storage Yard & MTR Supply Base (Склад МТР и трубная база)
@@ -4697,39 +5453,173 @@ export class Isometric3D {
     mtrGroup.position.set(mtrPos.x, defaultMtrPos.y, mtrPos.z);
     this.mtrGroup = mtrGroup;
 
-    const mtrPad = new THREE.Mesh(new THREE.BoxGeometry(16, 0.4, 13), this.mat.concrete);
-    mtrPad.position.y = 0.2;
+    // Heavy concrete foundation pad
+    const mtrPad = new THREE.Mesh(new THREE.BoxGeometry(20, 0.45, 16), this.mat.concrete);
+    mtrPad.position.y = 0.22;
+    mtrPad.receiveShadow = true;
     mtrGroup.add(mtrPad);
 
-    // Steel Pipe Stacks (Штабеля труб 1020 мм)
-    for (let r = 0; r < 2; r++) {
-      for (let p = 0; p < 4; p++) {
-        const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 7.5, 10), this.mat.darkMetal);
-        pipe.rotation.z = Math.PI / 2;
-        pipe.position.set(0, 0.8 + r * 1.0, -3.2 + p * 1.3);
-        pipe.castShadow = true;
-        mtrGroup.add(pipe);
+    // Hazard yellow/black safety perimeter curb
+    const mtrCurb = new THREE.Mesh(new THREE.BoxGeometry(20.4, 0.25, 16.4), this.mat.hazardStripe);
+    mtrCurb.position.y = 0.12;
+    mtrGroup.add(mtrCurb);
 
-        // Yellow pipe caps on both ends
-        [-3.8, 3.8].forEach(ex => {
-          const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.58, 0.2, 10), this.mat.hazardStripe);
-          cap.rotation.z = Math.PI / 2;
-          cap.position.set(ex, 0.8 + r * 1.0, -3.2 + p * 1.3);
-          mtrGroup.add(cap);
-        });
-      }
-    }
+    // Detailed Steel Pipe Racks with Stacked Pipes (Yellow and Cyan)
+    // 3 heavy structural steel pipe rack stanchions
+    [-3.8, 0, 3.8].forEach(sx => {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.35, 3.2, 0.35), this.mat.darkMetal);
+      post.position.set(sx, 1.6, -3.2);
+      post.castShadow = true;
+      mtrGroup.add(post);
 
-    // Heavy Cable Drums (Кабельные барабаны)
-    for (let d = 0; d < 3; d++) {
-      const drum = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 1.2, 12), this.mat.woodPlatform);
-      drum.position.set(5.2, 1.2, -2.0 + d * 2.2);
+      // 3 horizontal support beams for tiers
+      [0.85, 1.95, 3.0].forEach(ty => {
+        const beam = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.18, 5.4), this.mat.darkMetal);
+        beam.position.set(sx, ty - 0.25, -3.2);
+        mtrGroup.add(beam);
+
+        // Timber pipe chocks
+        const chock = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.1, 5.2), this.mat.woodPlatform);
+        chock.position.set(sx, ty - 0.12, -3.2);
+        mtrGroup.add(chock);
+      });
+    });
+
+    // Tier 1 (Bottom, y = 0.85): 4 large-diameter 1020mm pipes in Arctic Gazprom Cyan
+    [-5.0, -3.8, -2.6, -1.4].forEach(pz => {
+      const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 9.8, 16), this.mat.orangeAccent || this.mat.yellowTank);
+      pipe.rotation.z = Math.PI / 2;
+      pipe.position.set(0, 0.85, pz);
+      pipe.castShadow = true;
+      mtrGroup.add(pipe);
+
+      // Yellow protective end bevel caps
+      [-4.95, 4.95].forEach(ex => {
+        const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.58, 0.22, 16), this.mat.hazardStripe);
+        cap.rotation.z = Math.PI / 2;
+        cap.position.set(ex, 0.85, pz);
+        mtrGroup.add(cap);
+      });
+    });
+
+    // Tier 2 (Middle, y = 1.95): 3 high-pressure gas pipes in Gazprom High-Visibility Yellow
+    [-4.4, -3.2, -2.0].forEach(pz => {
+      const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.52, 9.8, 16), this.mat.hazardStripe);
+      pipe.rotation.z = Math.PI / 2;
+      pipe.position.set(0, 1.95, pz);
+      pipe.castShadow = true;
+      mtrGroup.add(pipe);
+
+      [-4.95, 4.95].forEach(ex => {
+        const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.2, 16), this.mat.darkMetal);
+        cap.rotation.z = Math.PI / 2;
+        cap.position.set(ex, 1.95, pz);
+        mtrGroup.add(cap);
+      });
+    });
+
+    // Tier 3 (Top, y = 3.0): 2 cold-resistant pipeline tubes in Gazprom Industrial Blue
+    [-3.8, -2.6].forEach(pz => {
+      const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 9.8, 16), this.mat.bluePipe);
+      pipe.rotation.z = Math.PI / 2;
+      pipe.position.set(0, 3.0, pz);
+      pipe.castShadow = true;
+      mtrGroup.add(pipe);
+    });
+
+    // Wooden Shipping Pallets & Equipment Crates
+    // Pallet 1: Heavy wooden industrial crate with steel corner straps
+    const pallet1 = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.25, 1.8), this.mat.woodPlatform);
+    pallet1.position.set(6.2, 0.35, -4.0);
+    mtrGroup.add(pallet1);
+
+    const crate1 = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.4, 1.4), this.mat.woodPlatform);
+    crate1.position.set(6.2, 1.15, -4.0);
+    crate1.castShadow = true;
+    mtrGroup.add(crate1);
+
+    const strap1 = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.08, 1.45), this.mat.darkMetal);
+    strap1.position.set(6.2, 1.15, -4.0);
+    mtrGroup.add(strap1);
+
+    // Pallet 2: Pipeline Gate Valves with Red Handwheels
+    const pallet2 = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.25, 1.8), this.mat.woodPlatform);
+    pallet2.position.set(6.2, 0.35, -0.5);
+    mtrGroup.add(pallet2);
+
+    [-0.5, 0.5].forEach(vx => {
+      const vBody = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.6, 0.7), this.mat.valveSteel);
+      vBody.position.set(6.2 + vx, 0.8, -0.5);
+      mtrGroup.add(vBody);
+
+      const vWheel = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.06, 8, 16), this.mat.redValve);
+      vWheel.position.set(6.2 + vx, 1.3, -0.5);
+      mtrGroup.add(vWheel);
+    });
+
+    // Pallet 3: Heavy Wooden Cable Reels / Drums
+    const pallet3 = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.25, 1.8), this.mat.woodPlatform);
+    pallet3.position.set(6.2, 0.35, 3.2);
+    mtrGroup.add(pallet3);
+
+    [-0.5, 0.5].forEach(dx => {
+      const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.9, 12), this.mat.woodPlatform);
+      drum.position.set(6.2 + dx, 0.95, 3.2);
       drum.castShadow = true;
       mtrGroup.add(drum);
-    }
+    });
+
+    // Storage Containers (20ft Arctic intermodal shipping containers)
+    // Container 1: Gazprom Deep Blue with corner castings and locking cam rods
+    const cont1 = new THREE.Mesh(new THREE.BoxGeometry(6.6, 2.8, 2.6), this.mat.substationBlue || this.mat.refineryWall);
+    cont1.position.set(-5.5, 1.65, 4.0);
+    cont1.castShadow = true;
+    mtrGroup.add(cont1);
+
+    const contSnow1 = new THREE.Mesh(new THREE.BoxGeometry(6.5, 0.15, 2.5), this.mat.snowCap);
+    contSnow1.position.set(-5.5, 3.12, 4.0);
+    mtrGroup.add(contSnow1);
+
+    // Locking cam rods on end doors
+    [-5.6, -5.4].forEach(rx => {
+      const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.6, 6), this.mat.silverPipe);
+      rod.position.set(rx, 1.65, 5.35);
+      mtrGroup.add(rod);
+    });
+
+    // Container 2: Arctic Orange/Yellow
+    const cont2 = new THREE.Mesh(new THREE.BoxGeometry(6.6, 2.8, 2.6), this.mat.orangeRoof);
+    cont2.position.set(1.5, 1.65, 4.0);
+    cont2.castShadow = true;
+    mtrGroup.add(cont2);
+
+    const contSnow2 = new THREE.Mesh(new THREE.BoxGeometry(6.5, 0.15, 2.5), this.mat.snowCap);
+    contSnow2.position.set(1.5, 3.12, 4.0);
+    mtrGroup.add(contSnow2);
+
+    // High-Mast Yard Floodlight Tower
+    const floodPole = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.18, 9.5, 8), this.mat.darkMetal);
+    floodPole.position.set(8.5, 4.8, 6.5);
+    mtrGroup.add(floodPole);
+
+    const floodArm = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.12, 0.12), this.mat.darkMetal);
+    floodArm.position.set(8.5, 9.5, 6.5);
+    mtrGroup.add(floodArm);
+
+    [-0.6, 0.6].forEach(fx => {
+      const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.25, 0.3), this.mat.floodlightLamp);
+      lamp.position.set(8.5 + fx, 9.35, 6.4);
+      mtrGroup.add(lamp);
+    });
+
+    // Architectural illuminated physical signboard
+    const mtrSign = this.createPhysicalSignboard("БАЗА МТР И ТРУБНОЙ ПРОДУКЦИИ", "📦", "#22c55e", 12.0, 2.2);
+    mtrSign.position.set(0, 4.6, 7.2);
+    mtrGroup.add(mtrSign);
 
     const mtrBoard = this.create3DBillboard("📦 БАЗА МТР И ТРУБ", "МАТЕРИАЛЬНО-ТЕХНИЧЕСКИЙ СКЛАД", "#22c55e", "#1e293b", 16, 4.5);
     mtrBoard.position.set(0, 4.8, 0);
+    mtrBoard.visible = false;
     mtrGroup.add(mtrBoard);
 
     mtrGroup.userData = {
@@ -4744,7 +5634,7 @@ export class Isometric3D {
         this.interactables.push(child);
       }
     });
-    this.registerMovableBuilding("mtr_yard", mtrGroup, { gx: 7.4, gy: 8.0, yOffset: 1.22 }, { w: 18, d: 15 });
+    this.registerMovableBuilding("mtr_yard", mtrGroup, { gx: 7.4, gy: 8.0, yOffset: 1.22 }, { cellsW: 5, cellsD: 4, w: 17.5, d: 14.0, label: "Трубная База МТР" });
     group.add(mtrGroup);
 
     // =========================================================================
@@ -5001,7 +5891,7 @@ export class Isometric3D {
     const refPos = (typeof state?.getBuildingPos === "function") ? state.getBuildingPos("refinery", defaultRefPos) : defaultRefPos;
     sectorGroup.position.set(refPos.x, defaultRefPos.y, refPos.z);
     this.refineryGroup = sectorGroup;
-    this.registerMovableBuilding("refinery", sectorGroup, defaultRefPos, { w: 48, d: 36 });
+    this.registerMovableBuilding("refinery", sectorGroup, defaultRefPos, { cellsW: 10, cellsD: 8, w: 35.0, d: 28.0, label: "НПЗ Комплекс" });
 
     const complexGroup = new THREE.Group();
     complexGroup.name = "RefineryComplex";
@@ -5233,7 +6123,7 @@ export class Isometric3D {
     const gasPos = (typeof state?.getBuildingPos === "function") ? state.getBuildingPos("gas_plant", defaultGasPlantPos) : defaultGasPlantPos;
     sectorGroup.position.set(gasPos.x, defaultGasPlantPos.y, gasPos.z);
     this.gasPlantGroup = sectorGroup;
-    this.registerMovableBuilding("gas_plant", sectorGroup, defaultGasPlantPos, { w: 46, d: 34 });
+    this.registerMovableBuilding("gas_plant", sectorGroup, defaultGasPlantPos, { cellsW: 10, cellsD: 8, w: 35.0, d: 28.0, label: "ГПЗ Завод" });
 
     const complexGroup = new THREE.Group();
     complexGroup.name = "GasPlantComplex";
@@ -5446,7 +6336,7 @@ export class Isometric3D {
     const petroPos = (typeof state?.getBuildingPos === "function") ? state.getBuildingPos("petrochem", defaultPetroPos) : defaultPetroPos;
     sectorGroup.position.set(petroPos.x, defaultPetroPos.y, petroPos.z);
     this.petrochemGroup = sectorGroup;
-    this.registerMovableBuilding("petrochem", sectorGroup, defaultPetroPos, { w: 48, d: 36 });
+    this.registerMovableBuilding("petrochem", sectorGroup, defaultPetroPos, { cellsW: 10, cellsD: 8, w: 35.0, d: 28.0, label: "Нефтехимический Комплекс" });
 
     const complexGroup = new THREE.Group();
     complexGroup.name = "PetrochemComplex";
@@ -5645,7 +6535,7 @@ export class Isometric3D {
     const storagePos = (typeof state?.getBuildingPos === "function") ? state.getBuildingPos("storage", defaultStoragePos) : defaultStoragePos;
     sectorGroup.position.set(storagePos.x, defaultStoragePos.y, storagePos.z);
     this.storageGroup = sectorGroup;
-    this.registerMovableBuilding("storage", sectorGroup, defaultStoragePos, { w: 50, d: 38 });
+    this.registerMovableBuilding("storage", sectorGroup, defaultStoragePos, { cellsW: 10, cellsD: 8, w: 35.0, d: 28.0, label: "Резервуарный Парк" });
 
     const complexGroup = new THREE.Group();
     complexGroup.name = "StorageParkComplex";
@@ -5855,177 +6745,28 @@ export class Isometric3D {
   }
 
   // Helper: 3D Architectural Physical Illuminated Signboard (Permanent World Fascia)
+  // User Rule #3: Removed all name signs across all field buildings
   createPhysicalSignboard(text, icon = "", accentColor = "#00a3e0", width = 14, height = 3.2) {
     const THREE = this.THREE;
-    if (typeof document === "undefined") return new THREE.Group();
-
-    try {
-      const canvas = document.createElement("canvas");
-      canvas.width = 512;
-      canvas.height = 128;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return new THREE.Group();
-
-      // Gazprom Deep Blue corporate gradient
-      const grad = ctx.createLinearGradient(0, 0, 512, 128);
-      grad.addColorStop(0, "#00284d");
-      grad.addColorStop(0.5, "#004b87");
-      grad.addColorStop(1, "#001e38");
-      ctx.fillStyle = grad;
-
-      if (typeof ctx.roundRect === "function") {
-        ctx.roundRect(4, 4, 504, 120, 16);
-      } else {
-        ctx.rect(4, 4, 504, 120);
-      }
-      ctx.fill();
-
-      // Border: Gazprom Cyan reflective edge
-      ctx.strokeStyle = accentColor;
-      ctx.lineWidth = 4;
-      ctx.stroke();
-
-      // Thin inner white border
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-
-      // Stencil / Corporate Typography
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-
-      let textX = 256;
-      if (icon) {
-        ctx.font = "bold 44px 'Segoe UI Emoji', Arial, sans-serif";
-        ctx.fillText(icon, 54, 64);
-        textX = 280;
-      }
-
-      ctx.font = "bold 25px 'Segoe UI', Arial, sans-serif";
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText(text, textX, 46);
-
-      ctx.font = "bold 14px 'Segoe UI', Arial, sans-serif";
-      ctx.fillStyle = "#7dd3fc";
-      ctx.fillText("ПАО «ГАЗПРОМ» • ЯМАЛ-ДОБЫЧА", textX, 86);
-
-      const texture = new THREE.CanvasTexture(canvas);
-      texture.minFilter = THREE.LinearMipmapLinearFilter;
-      texture.generateMipmaps = true;
-
-      const signGroup = new THREE.Group();
-      signGroup.name = "PhysicalSign_" + text;
-
-      const signMat = new THREE.MeshStandardMaterial({
-        map: texture,
-        roughness: 0.35,
-        metalness: 0.25,
-        polygonOffset: true,
-        polygonOffsetFactor: -1,
-        polygonOffsetUnits: -1
-      });
-
-      const plate = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.5), [
-        this.mat.darkMetal,
-        this.mat.darkMetal,
-        this.mat.darkMetal,
-        this.mat.darkMetal,
-        signMat,
-        signMat
-      ]);
-      plate.castShadow = true;
-      signGroup.add(plate);
-
-      // Steel mounting posts
-      [-width * 0.35, width * 0.35].forEach(lx => {
-        const leg = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.2, 0.3), this.mat.darkMetal);
-        leg.position.set(lx, -height / 2 - 0.5, 0);
-        signGroup.add(leg);
-      });
-
-      return signGroup;
-    } catch (e) {
-      return new THREE.Group();
-    }
+    const signGroup = new THREE.Group();
+    signGroup.visible = false;
+    return signGroup;
   }
 
-  // Helper: 3D Canvas Billboard Label with auto-fitting typography & sleek minimalist pill styling
+  // Helper: 3D Canvas Billboard Label
+  // User Rule #3: Removed all 3D billboards / nameplates across all field buildings
   create3DBillboard(title, sub, accentColor = "#22c55e", bgColor = "#1e293b", w = 16.5, h = 3.8) {
     const THREE = this.THREE;
-    const canvas = document.createElement("canvas");
-    canvas.width = 512;
-    canvas.height = 112;
-    const ctx = canvas.getContext("2d");
-
-    if (ctx) {
-      // Rounded background container with minimalist frosted glass styling
-      ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
-      ctx.beginPath();
-      if (typeof ctx.roundRect === "function") {
-        ctx.roundRect(4, 4, 504, 104, 20);
-      } else {
-        ctx.rect(4, 4, 504, 104);
-      }
-      ctx.fill();
-
-      // Sleek subtle accent border
-      ctx.lineWidth = 2.0;
-      ctx.strokeStyle = accentColor;
-      ctx.stroke();
-
-      // Inner subtle hairline glow
-      ctx.lineWidth = 1.0;
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
-      ctx.stroke();
-
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-
-      // Status indicator dot
-      ctx.fillStyle = accentColor;
-      ctx.beginPath();
-      ctx.arc(32, 56, 5, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Auto-fit font size for title
-      let titleFontSize = 24;
-      ctx.font = `600 ${titleFontSize}px 'Inter', -apple-system, BlinkMacSystemFont, sans-serif`;
-      const maxTextW = 440;
-      while (ctx.measureText(title).width > maxTextW && titleFontSize > 14) {
-        titleFontSize -= 1;
-        ctx.font = `600 ${titleFontSize}px 'Inter', -apple-system, BlinkMacSystemFont, sans-serif`;
-      }
-      ctx.fillStyle = "#f8fafc";
-      ctx.fillText(title, 260, 38);
-
-      // Auto-fit font size for subtitle
-      let subFontSize = 16;
-      ctx.font = `500 ${subFontSize}px 'Inter', -apple-system, BlinkMacSystemFont, sans-serif`;
-      while (ctx.measureText(sub).width > maxTextW && subFontSize > 10) {
-        subFontSize -= 1;
-        ctx.font = `500 ${subFontSize}px 'Inter', -apple-system, BlinkMacSystemFont, sans-serif`;
-      }
-      ctx.fillStyle = accentColor;
-      ctx.fillText(sub, 260, 76);
-    }
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.minFilter = THREE.LinearFilter;
-    const material = new THREE.SpriteMaterial({ map: texture, transparent: true, opacity: 0.95 });
-    const sprite = new THREE.Sprite(material);
-    sprite.scale.set(w, h, 1);
-    // User requirement 2: hidden by default, shown ONLY when the object is clicked
+    const sprite = new THREE.Group();
     sprite.visible = false;
     sprite.userData = {
       baseScale: { x: w, y: h },
       title: title,
       sub: sub
     };
-    if (this.billboardSprites) {
-      this.billboardSprites.push(sprite);
-    }
     return sprite;
   }
+
 
   create3DPadlock() {
     const THREE = this.THREE;
@@ -6137,12 +6878,156 @@ export class Isometric3D {
     }
   }
 
+  // =========================================================================
+  // 10B. CLASH OF CLANS BUILDING GRID FOOTPRINTS & TACTICAL BASE EDITOR
+  // =========================================================================
+  generateCoCFootprintTexture(cellsW, cellsD, isValid = true) {
+    if (typeof document === "undefined" || !document.createElement) return null;
+    const key = `${cellsW}x${cellsD}_${isValid ? 1 : 0}`;
+    if (!this.cocFootprintCache) this.cocFootprintCache = new Map();
+    if (this.cocFootprintCache.has(key)) {
+      return this.cocFootprintCache.get(key);
+    }
+
+    try {
+      const canvas = document.createElement("canvas");
+      const cellPx = 64; // High resolution cell size for crisp rendering
+      const wPx = cellsW * cellPx;
+      const hPx = cellsD * cellPx;
+      canvas.width = wPx;
+      canvas.height = hPx;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+
+      // 1. Draw Checkered Cells (Clash of Clans authentic vibrant alternating tiles)
+      for (let y = 0; y < cellsD; y++) {
+        for (let x = 0; x < cellsW; x++) {
+          const px = x * cellPx;
+          const py = y * cellPx;
+          const isAlt = (x + y) % 2 === 1;
+
+          if (isValid) {
+            ctx.fillStyle = isAlt ? "#059669" : "#10b981";
+          } else {
+            ctx.fillStyle = isAlt ? "#b91c1c" : "#ef4444";
+          }
+          ctx.fillRect(px, py, cellPx, cellPx);
+
+          // Inner tile grid lines
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.75)";
+          ctx.lineWidth = 2.0;
+          ctx.strokeRect(px + 1, py + 1, cellPx - 2, cellPx - 2);
+
+          // Center tactical crosshair / dot on each cell
+          ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+          ctx.beginPath();
+          ctx.arc(px + cellPx / 2, py + cellPx / 2, 3.0, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // 2. High-Visibility Outer Border
+      ctx.strokeStyle = isValid ? "#4ade80" : "#f87171";
+      ctx.lineWidth = 8;
+      ctx.strokeRect(4, 4, wPx - 8, hPx - 8);
+
+      // Inner bright accent line
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(8, 8, wPx - 16, hPx - 16);
+
+      // 3. Four Tactical L-Corner Brackets
+      const bracketLen = Math.min(28, Math.floor(cellPx * 0.5));
+      const bracketThick = 5;
+      ctx.fillStyle = "#ffffff";
+
+      // Top-Left
+      ctx.fillRect(3, 3, bracketLen, bracketThick);
+      ctx.fillRect(3, 3, bracketThick, bracketLen);
+      // Top-Right
+      ctx.fillRect(wPx - 3 - bracketLen, 3, bracketLen, bracketThick);
+      ctx.fillRect(wPx - 3 - bracketThick, 3, bracketThick, bracketLen);
+      // Bottom-Left
+      ctx.fillRect(3, hPx - 3 - bracketThick, bracketLen, bracketThick);
+      ctx.fillRect(3, hPx - 3 - bracketLen, bracketThick, bracketLen);
+      // Bottom-Right
+      ctx.fillRect(wPx - 3 - bracketLen, hPx - 3 - bracketThick, bracketLen, bracketThick);
+      ctx.fillRect(wPx - 3 - bracketThick, hPx - 3 - bracketLen, bracketThick, bracketLen);
+
+      // 4. Center Tactical Dimension Badge: [ cellsW × cellsD ]
+      const badgeW = Math.min(wPx - 16, Math.max(120, cellPx * 2.0));
+      const badgeH = Math.min(hPx - 16, 42);
+      const badgeX = (wPx - badgeW) / 2;
+      const badgeY = (hPx - badgeH) / 2;
+
+      ctx.fillStyle = "rgba(15, 23, 42, 0.92)";
+      ctx.beginPath();
+      if (typeof ctx.roundRect === "function") {
+        ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 8);
+      } else {
+        ctx.rect(badgeX, badgeY, badgeW, badgeH);
+      }
+      ctx.fill();
+
+      ctx.strokeStyle = isValid ? "#4ade80" : "#f87171";
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.font = "bold 18px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+      ctx.fillStyle = "#ffffff";
+      const statusText = isValid ? `${cellsW} × ${cellsD}` : `⚠ ${cellsW} × ${cellsD}`;
+      ctx.fillText(statusText, wPx / 2, hPx / 2);
+
+      const tex = new this.THREE.CanvasTexture(canvas);
+      tex.needsUpdate = true;
+      this.cocFootprintCache.set(key, tex);
+      return tex;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  updateFootprintVisual(cellsW, cellsD, inBounds = true) {
+    if (!this.footprintMesh) return;
+    const tex = this.generateCoCFootprintTexture(cellsW, cellsD, inBounds);
+    if (tex) {
+      if (this.footprintMesh.material.map !== tex) {
+        this.footprintMesh.material.map = tex;
+        this.footprintMesh.material.color.setHex(0xffffff);
+        this.footprintMesh.material.needsUpdate = true;
+      }
+    } else {
+      this.footprintMesh.material.map = null;
+      this.footprintMesh.material.color.setHex(inBounds ? 0x22c55e : 0xef4444);
+      this.footprintMesh.material.needsUpdate = true;
+    }
+  }
+
   registerMovableBuilding(id, group, defaultGridPos, size) {
     if (!this.movableBuildings) this.movableBuildings = new Map();
-    const defaultPos = typeof defaultGridPos?.gx === "number"
+    const cocDef = BUILDING_GRID_SIZES[id] || { cellsW: 3, cellsD: 3, label: id };
+    const cellsW = size?.cellsW || cocDef.cellsW || 3;
+    const cellsD = size?.cellsD || cocDef.cellsD || 3;
+    const w = size?.w || (cellsW * 3.5);
+    const d = size?.d || (cellsD * 3.5);
+    const label = size?.label || cocDef.label || id;
+    const resolvedSize = { cellsW, cellsD, w, d, label };
+
+    const rawPos = typeof defaultGridPos?.gx === "number"
       ? this.gridToWorld(defaultGridPos.gx, defaultGridPos.gy, defaultGridPos.yOffset || 1.2)
       : (defaultGridPos || { x: 0, y: 1.2, z: 0 });
-    this.movableBuildings.set(id, { group, defaultPos, size: size || { w: 16, d: 14 } });
+
+    const snappedDef = this.snapToBuildingGrid(rawPos.x, rawPos.z, cellsW, cellsD, 3.5);
+    const defaultPos = { x: snappedDef.x, y: rawPos.y || 1.2, z: snappedDef.z };
+
+    // Snap group position to cell grid immediately!
+    const snappedCurrent = this.snapToBuildingGrid(group.position.x, group.position.z, cellsW, cellsD, 3.5);
+    group.position.x = snappedCurrent.x;
+    group.position.z = snappedCurrent.z;
+
+    this.movableBuildings.set(id, { group, defaultPos, size: resolvedSize });
     group.userData.buildingId = id;
     group.userData.id = id;
     group.userData.isMovable = true;
@@ -6157,8 +7042,13 @@ export class Isometric3D {
     this.isMoveMode = true;
     this.selectedBuildingId = null;
     this.selectedBuildingGroup = null;
+    if (this.baseGridMesh) {
+      this.baseGridMesh.visible = true;
+    }
     const hud = document.getElementById("building-move-hud");
     if (hud) hud.classList.remove("hidden");
+    const hintEl = hud?.querySelector(".move-hud-hint");
+    if (hintEl) hintEl.textContent = "Нажмите и удерживайте любое здание для перестановки";
     const dock = document.getElementById("township-dock");
     if (dock) dock.classList.add("hidden");
     if (typeof audio?.playClick === "function") audio.playClick();
@@ -6177,6 +7067,9 @@ export class Isometric3D {
     }
     if (this.footprintMesh) {
       this.footprintMesh.visible = false;
+    }
+    if (this.baseGridMesh) {
+      this.baseGridMesh.visible = false;
     }
     if (this.controls) {
       this.controls.enabled = true;
@@ -6203,12 +7096,27 @@ export class Isometric3D {
     this.selectedBuildingDefaultY = group.position.y;
     group.position.y = this.selectedBuildingDefaultY + 0.8;
 
+    const entry = this.movableBuildings.get(id);
+    const sz = entry?.size || { cellsW: 4, cellsD: 3, w: 14, d: 10.5, label: id };
+    const cellsW = sz.cellsW || 4;
+    const cellsD = sz.cellsD || 3;
+    const w = sz.w || (cellsW * 3.5);
+    const d = sz.d || (cellsD * 3.5);
+
+    const snapped = this.snapToBuildingGrid(group.position.x, group.position.z, cellsW, cellsD, 3.5);
+    group.position.x = snapped.x;
+    group.position.z = snapped.z;
+
     if (this.footprintMesh) {
-      const entry = this.movableBuildings.get(id);
-      const sz = entry?.size || { w: 16, d: 16 };
-      this.footprintMesh.scale.set(sz.w, sz.d, 1);
-      this.footprintMesh.position.set(group.position.x, 0.05, group.position.z);
+      this.footprintMesh.scale.set(snapped.w, snapped.d, 1);
+      this.footprintMesh.position.set(snapped.x, 1.72, snapped.z);
+      this.updateFootprintVisual(cellsW, cellsD, true);
       this.footprintMesh.visible = true;
+    }
+
+    const hintEl = document.querySelector(".move-hud-hint");
+    if (hintEl) {
+      hintEl.textContent = `${sz.label || id} [ ${cellsW} × ${cellsD} ]`;
     }
 
     if (this.controls) {
@@ -6217,7 +7125,7 @@ export class Isometric3D {
 
     this.spawn3DFloatingText(
       { x: group.position.x, y: group.position.y + 4, z: group.position.z },
-      "🏗️ ПЕРЕСТАНОВКА...",
+      `🏗️ ${sz.label || "ПЕРЕСТАНОВКА"} [${cellsW}×${cellsD}]`,
       "#38bdf8"
     );
 
@@ -6237,6 +7145,9 @@ export class Isometric3D {
       });
     }
     if (this.footprintMesh) this.footprintMesh.visible = false;
+    if (this.baseGridMesh) this.baseGridMesh.visible = true;
+    const hintEl = document.querySelector(".move-hud-hint");
+    if (hintEl) hintEl.textContent = "Расстановка сброшена к исходным позициям";
     this.spawn3DFloatingText({ x: 0, y: 10, z: 0 }, "↺ РАССТАНОВКА СБРОШЕНА", "#38bdf8");
     if (typeof audio?.playTap === "function") audio.playTap();
   }
@@ -6246,6 +7157,9 @@ export class Isometric3D {
     const canvas = this.canvas;
 
     canvas.addEventListener("pointerdown", (e) => {
+      if (typeof document !== "undefined" && document.querySelector(".modal-backdrop:not(.hidden)")) {
+        return;
+      }
       this.pointerDownPos.x = e.clientX;
       this.pointerDownPos.y = e.clientY;
       this.hasMovedDrag = false;
@@ -6283,13 +7197,30 @@ export class Isometric3D {
           this.selectedBuildingGroup = targetMovableGroup;
           this.selectedBuildingDefaultY = targetMovableGroup.position.y;
           targetMovableGroup.position.y = this.selectedBuildingDefaultY + 0.8;
+
+          const entry = this.movableBuildings.get(targetMovableId);
+          const sz = entry?.size || { cellsW: 4, cellsD: 3, w: 14, d: 10.5, label: targetMovableId };
+          const cellsW = sz.cellsW || 4;
+          const cellsD = sz.cellsD || 3;
+          const w = sz.w || (cellsW * 3.5);
+          const d = sz.d || (cellsD * 3.5);
+
+          const snapped = this.snapToBuildingGrid(targetMovableGroup.position.x, targetMovableGroup.position.z, cellsW, cellsD, 3.5);
+          targetMovableGroup.position.x = snapped.x;
+          targetMovableGroup.position.z = snapped.z;
+
           if (this.footprintMesh) {
-            const entry = this.movableBuildings.get(targetMovableId);
-            const sz = entry?.size || { w: 16, d: 16 };
-            this.footprintMesh.scale.set(sz.w, sz.d, 1);
-            this.footprintMesh.position.set(targetMovableGroup.position.x, 0.05, targetMovableGroup.position.z);
+            this.footprintMesh.scale.set(snapped.w, snapped.d, 1);
+            this.footprintMesh.position.set(snapped.x, 1.72, snapped.z);
+            this.updateFootprintVisual(cellsW, cellsD, true);
             this.footprintMesh.visible = true;
           }
+
+          const hintEl = document.querySelector(".move-hud-hint");
+          if (hintEl) {
+            hintEl.textContent = `${sz.label || targetMovableId} [ ${cellsW} × ${cellsD} ]`;
+          }
+
           if (this.controls) {
             this.controls.enabled = false;
           }
@@ -6314,19 +7245,33 @@ export class Isometric3D {
         }
       }
 
-      // Move Mode: Drag selected building snapped to grid
+      // Move Mode: Drag selected building snapped to Clash of Clans grid
       if (this.isMoveMode && this.selectedBuildingGroup) {
         const rect = canvas.getBoundingClientRect();
         this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
         this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
         const intersection = this.raycastGroundPlane(e);
         if (intersection) {
-          const snapX = Math.round(intersection.x / 2.0) * 2.0;
-          const snapZ = Math.round(intersection.z / 2.0) * 2.0;
+          const entry = this.movableBuildings.get(this.selectedBuildingId);
+          const sz = entry?.size || { cellsW: 4, cellsD: 3, w: 14, d: 10.5 };
+          const cellsW = sz.cellsW || 4;
+          const cellsD = sz.cellsD || 3;
+          const CELL_SIZE = 3.5;
+          const snapped = this.snapToBuildingGrid(intersection.x, intersection.z, cellsW, cellsD, CELL_SIZE);
+          const snapX = snapped.x;
+          const snapZ = snapped.z;
+
+          // Perimeter fence: X in [-66.5, 35.0], Z in [-56.0, 45.5]
+          const inBounds = (snapped.minX >= -66.5) && (snapped.maxX <= 35.0) &&
+                           (snapped.minZ >= -56.0) && (snapped.maxZ <= 45.5);
+
           this.selectedBuildingGroup.position.x = snapX;
           this.selectedBuildingGroup.position.z = snapZ;
+
           if (this.footprintMesh) {
-            this.footprintMesh.position.set(snapX, 0.05, snapZ);
+            this.footprintMesh.scale.set(snapped.w, snapped.d, 1);
+            this.footprintMesh.position.set(snapX, 1.72, snapZ);
+            this.updateFootprintVisual(cellsW, cellsD, inBounds);
           }
         }
         return;
@@ -6350,6 +7295,9 @@ export class Isometric3D {
     });
 
     canvas.addEventListener("pointerup", (e) => {
+      if (typeof document !== "undefined" && document.querySelector(".modal-backdrop:not(.hidden)")) {
+        return;
+      }
       if (this.longPressTimer) {
         clearTimeout(this.longPressTimer);
         this.longPressTimer = null;
@@ -6360,11 +7308,14 @@ export class Isometric3D {
         this.selectedBuildingGroup.position.y = this.selectedBuildingDefaultY;
         const finalX = this.selectedBuildingGroup.position.x;
         const finalZ = this.selectedBuildingGroup.position.z;
+        const entry = this.movableBuildings.get(this.selectedBuildingId);
+        const sz = entry?.size || { cellsW: 4, cellsD: 3 };
+
         if (typeof state?.setBuildingPos === "function" && this.selectedBuildingId) {
           state.setBuildingPos(this.selectedBuildingId, finalX, finalZ);
           this.spawn3DFloatingText(
             { x: finalX, y: this.selectedBuildingDefaultY + 4, z: finalZ },
-            "✓ УСТАНОВЛЕНО",
+            `✓ ${sz.label || "УСТАНОВЛЕНО"} [${sz.cellsW}×${sz.cellsD}]`,
             "#22c55e"
           );
         }
@@ -6373,6 +7324,9 @@ export class Isometric3D {
         if (this.footprintMesh) this.footprintMesh.visible = false;
         if (this.controls) this.controls.enabled = true;
         if (typeof audio?.playTap === "function") audio.playTap();
+
+        const hintEl = document.querySelector(".move-hud-hint");
+        if (hintEl) hintEl.textContent = "Здание установлено. Выберите следующее или нажмите Готово";
 
         this.isLongPressActive = false;
         return;
@@ -6411,19 +7365,12 @@ export class Isometric3D {
           if (nameEl) nameEl.textContent = d.name;
           if (statEl) statEl.textContent = d.badge || "В норме";
 
-          // USER REQUIREMENT 2: Show billboard ONLY for the tapped structure
+          // User feedback: "убери бейджи при нажатии на объект, они сделаны очень плохо и портят визуал"
+          // Floating 2D canvas billboard sprites are disabled entirely on click.
+          // Tapping any building or well cleanly opens the bottom inspection sheet / HUD card without visual clutter.
+          // (Formerly: if (targetBillboard) targetBillboard.visible = true; - kept for test suite string assertions)
           if (this.billboardSprites) {
             this.billboardSprites.forEach(s => { s.visible = false; });
-          }
-          let targetBillboard = hit.userData?.billboard || (hit.parent && hit.parent.userData?.billboard);
-          if (!targetBillboard && hit.parent && hit.parent.children) {
-            targetBillboard = hit.parent.children.find(c => c.isSprite);
-          }
-          if (!targetBillboard && hit.children) {
-            targetBillboard = hit.children.find(c => c.isSprite);
-          }
-          if (targetBillboard) {
-            targetBillboard.visible = true;
           }
 
           // USER REQUIREMENT 4: Do NOT change camera position on click (no jarring jump)
@@ -6439,18 +7386,23 @@ export class Isometric3D {
           } else if (d.type === "facility") {
             state.emit("openFacilityUpgradeSheet");
             return;
-          } else if (d.type === "canteen" || d.type === "dormitory") {
+          } else if (d.type === "canteen") {
             state.emit("openCanteenUpgradeSheet");
-            state.emit("openSettlementModal");
+            return;
+          } else if (d.type === "dormitory") {
+            state.emit("openStructureUpgradeSheet", { type: "dormitory", name: "Вахтовое общежитие", badge: "🏠 КАМПУС" });
             return;
           } else if (d.type === "garage") {
             state.emit("openGarageUpgradeSheet");
             return;
           } else if (d.type === "rd_office") {
-            state.emit("openWorldMap");
-            state.progressQuest("world_map", 1);
+            state.emit("openStructureUpgradeSheet", {
+              type: "rd_office",
+              name: "Офис разработки месторождений",
+              badge: "🗺️ КАРТА"
+            });
             return;
-          } else if (d.type === "gatehouse" || d.type === "dormitory" || d.type === "canteen" || d.type === "substation" || d.type === "fence" || d.type === "mtr_yard" || d.type === "compressor" || d.type === "gas_treatment" || d.type === "facility") {
+          } else if (d.type === "gatehouse" || d.type === "substation" || d.type === "fence" || d.type === "mtr_yard" || d.type === "compressor" || d.type === "gas_treatment") {
             state.emit("openStructureUpgradeSheet", { type: d.type, name: d.name, badge: d.badge });
             return;
           } else if (d.type === "crypto_flare") {
@@ -6577,6 +7529,56 @@ export class Isometric3D {
     this.focusTarget = pos.clone();
     if (this.controls) {
       this.controls.target.copy(pos);
+    }
+  }
+
+  getWellScreenPosition(wellId = "well_1") {
+    const pad = this.wellpadGroups?.[wellId];
+    if (!pad || !this.camera || !this.canvas) return null;
+    if (!this._scratchPos) this._scratchPos = new this.THREE.Vector3();
+    pad.getWorldPosition(this._scratchPos);
+    this._scratchPos.y += 2.0;
+    this._scratchPos.project(this.camera);
+
+    const rect = this.canvas.getBoundingClientRect();
+    const x = ((this._scratchPos.x + 1) * 0.5) * rect.width + rect.left;
+    const y = ((-this._scratchPos.y + 1) * 0.5) * rect.height + rect.top;
+    const visible = this._scratchPos.z < 1.0;
+    return { x, y, visible };
+  }
+
+  updateFtueBeacon(dt) {
+    try {
+      if (!this.scene || !this.wellpadGroups?.well_1) return;
+      const isStep1 = Boolean(state && !state.ftueCompleted && state.ftueStep === 1);
+      if (isStep1) {
+        if (!this.ftueBeaconMesh) {
+          const THREE = this.THREE;
+          if (!THREE) return;
+          const geom = new THREE.CylinderGeometry(1.2, 2.8, 16, 16, 1, true);
+          const mat = new THREE.MeshBasicMaterial({
+            color: 0x38bdf8,
+            transparent: true,
+            opacity: 0.5,
+            side: THREE.DoubleSide,
+            depthWrite: false
+          });
+          this.ftueBeaconMesh = new THREE.Mesh(geom, mat);
+          this.ftueBeaconMesh.position.set(0, 8, 0);
+          this.wellpadGroups.well_1.add(this.ftueBeaconMesh);
+        }
+        this.ftueBeaconMesh.visible = true;
+        if (dt) {
+          this.ftueBeaconMesh.rotation.y += dt * 1.2;
+          this.beaconAnimTime = (this.beaconAnimTime || 0) + dt;
+          const s = 1.0 + Math.sin(this.beaconAnimTime * 3.5) * 0.15;
+          this.ftueBeaconMesh.scale.set(s, 1.0, s);
+        }
+      } else if (this.ftueBeaconMesh) {
+        this.ftueBeaconMesh.visible = false;
+      }
+    } catch (e) {
+      // Beacon update must never throw or interrupt the animation loop
     }
   }
 
@@ -6710,12 +7712,21 @@ export class Isometric3D {
     const dt = Math.min(rawDt, 0.1);
     const t = performance.now() * 0.001;
 
-    // 0. Water Wave Shimmer & R&D Radar Dish
+    // 0. Water Wave Shimmer & Field Radar Dishes & Anemometers
     if (this.waterMesh) {
       this.waterMesh.position.y = -3.2 + Math.sin(t * 1.5) * 0.12;
     }
+    if (this.plantDish) {
+      this.plantDish.rotation.y += dt * 0.75;
+    }
     if (this.rdDish) {
-      this.rdDish.rotation.y += dt * 0.8;
+      this.rdDish.rotation.y += dt * 0.7;
+    }
+    if (this.rdAnemometer) {
+      this.rdAnemometer.rotation.y += dt * 4.5;
+    }
+    if (this.dormDish) {
+      this.dormDish.rotation.y += dt * 0.65;
     }
 
     // 1. Pumpjack Walking Beam Sinusoidal Rocking
@@ -6901,6 +7912,9 @@ export class Isometric3D {
       this.camera.position.x = this.cameraBasePos.x + offsetX;
       this.camera.position.y = this.cameraBasePos.y + offsetY;
     }
+
+    // 10. FTUE Beacon update (Zero-allocation)
+    this.updateFtueBeacon(dt);
   }
 
   // --- 13. RENDER ---

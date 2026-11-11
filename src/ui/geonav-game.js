@@ -1069,6 +1069,7 @@ export class GeonavGameView {
     }
 
     this.ensureModalDom();
+    state.emit("closeAllBottomSheets");
     this.modal.classList.remove("hidden");
     this.isOpen = true;
 

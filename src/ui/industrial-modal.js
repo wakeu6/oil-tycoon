@@ -76,6 +76,7 @@ export class IndustrialModalView {
 
   open(sectorId = "refinery") {
     if (!this.modalEl) return;
+    this.state?.emit?.("closeAllBottomSheets");
     this.currentSector = sectorId;
     this.modalEl.classList.remove("hidden");
 

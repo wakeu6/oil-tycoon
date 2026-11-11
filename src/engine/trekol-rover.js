@@ -378,11 +378,6 @@ export class RoadNetwork {
     const offsetZ = newZ < 0 ? -9.5 : 9.5;
     wp.roadX = newX;
     wp.roadZ = newZ + offsetZ;
-    // Keep waypoint outside the fence perimeter buffer if close to perimeter walls
-    if (wp.roadX >= -70.0 && wp.roadX <= 38.0 && wp.roadZ >= -58.0 && wp.roadZ <= 50.0) {
-      if (newZ >= 0) wp.roadZ = Math.max(wp.roadZ, 52.0);
-      else wp.roadZ = Math.min(wp.roadZ, -60.0);
-    }
     wp.x = wp.roadX;
     wp.z = wp.roadZ;
   }

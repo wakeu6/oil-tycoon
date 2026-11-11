@@ -320,6 +320,10 @@ export class TownshipWindowCoordinator {
  */
 export class GameApp {
   constructor() {
+    this.state = state;
+    if (typeof window !== "undefined") {
+      window.state = state;
+    }
     this.canvasView = null;
     this.hudView = null;
     this.wellCardsView = null;
@@ -375,7 +379,9 @@ export class GameApp {
       this.wellCardsView = new WellCardsView(wellsContainer);
     }
     this.modals = new ModalsManager();
-    this.modals.checkDailyStreak();
+    if (state.ftueCompleted) {
+      this.modals.checkDailyStreak();
+    }
     this.tickerView = new NewsTickerView();
     this.tutorialManager = new TutorialManager();
     this.worldMapView = new WorldMapView();
@@ -651,35 +657,39 @@ export class GameApp {
   }
 
   loop(currentTime) {
-    // Delta-time clamping & freeze protection
-    let dt = 0;
-    if (!this.isSimulationFrozen && !this.isTabHidden) {
-      const rawDt = (currentTime - this.lastFrameTime) / 1000;
-      dt = Math.min(rawDt, 0.1); // Clamped to 100ms max to prevent physics spiral
-    }
-    this.lastFrameTime = currentTime;
-
-    // Simulation Tick
-    if (dt > 0) {
-      state.tick(dt);
-    }
-
-    // Render & Visual Update
-    if (this.canvasView) {
-      this.canvasView.update(dt);
-      this.canvasView.render();
-    }
-
-    // Autosave Debounce
-    if (dt > 0) {
-      this.autoSaveTimer += dt;
-      if (this.autoSaveTimer >= 4.0) {
-        this.autoSaveTimer = 0;
-        storage.save(state.exportSave());
+    try {
+      // Delta-time clamping & freeze protection
+      let dt = 0;
+      if (!this.isSimulationFrozen && !this.isTabHidden) {
+        const rawDt = (currentTime - this.lastFrameTime) / 1000;
+        dt = Math.min(rawDt, 0.1); // Clamped to 100ms max to prevent physics spiral
       }
-    }
+      this.lastFrameTime = currentTime;
 
-    requestAnimationFrame((t) => this.loop(t));
+      // Simulation Tick
+      if (dt > 0) {
+        state.tick(dt);
+      }
+
+      // Render & Visual Update
+      if (this.canvasView) {
+        this.canvasView.update(dt);
+        this.canvasView.render();
+      }
+
+      // Autosave Debounce
+      if (dt > 0) {
+        this.autoSaveTimer += dt;
+        if (this.autoSaveTimer >= 4.0) {
+          this.autoSaveTimer = 0;
+          storage.save(state.exportSave());
+        }
+      }
+    } catch (loopErr) {
+      console.error("[GameApp] Critical error in frame loop:", loopErr);
+    } finally {
+      requestAnimationFrame((t) => this.loop(t));
+    }
   }
 }
 

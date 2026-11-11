@@ -1,6 +1,6 @@
 /**
- * Onboarding Tutorial, Savelich Quests & Animated Hand Pointer
- * Implements interactive guidance, foreman Savelich progression and hand cues.
+ * Onboarding Tutorial, Foreman Savelich FTUE Prologue & Spotlight Coordinator
+ * Implements interactive guidance, foreman Savelich progression and spotlight cues.
  */
 import { state } from "../state.js";
 import { audio } from "../audio.js";
@@ -28,12 +28,25 @@ export class TutorialManager {
     this.savelichNextBonus = document.getElementById("savelich-next-bonus");
     this.savelichCostText = document.getElementById("savelich-upgrade-cost");
 
+    // FTUE Spotlight & Dialogue Elements
+    this.spotlightContainer = document.getElementById("ftue-spotlight-container");
+    this.backdropScrim = document.getElementById("ftue-backdrop-scrim");
+    this.spotlightHole = document.getElementById("ftue-spotlight-hole");
+    this.dialogCard = document.getElementById("ftue-dialog-card");
+    this.speakerName = document.getElementById("ftue-speaker-name");
+    this.stepBadge = document.getElementById("ftue-step-badge");
+    this.dialogText = document.getElementById("ftue-dialog-text");
+    this.btnFtueAction = document.getElementById("btn-ftue-action");
+    this.ftueActionText = document.getElementById("ftue-action-text");
+    this.btnFtueSkip = document.getElementById("btn-ftue-skip");
+
     this._handTimer = null;
+    this._rafId = null;
 
     this.initEvents();
     this.updateQuestBanner();
     this.updateSavelichModal();
-    this.updateHandPointer();
+    this.updateFtueFlow();
   }
 
   initEvents() {
@@ -41,7 +54,17 @@ export class TutorialManager {
       this.btnClaimQuest.addEventListener("click", () => {
         if (state.claimQuestReward()) {
           this.updateQuestBanner();
-          this.updateHandPointer();
+          if (!state.ftueCompleted && (state.ftueStep === 3 || state.ftueStep === 4)) {
+            state.completeFtue();
+          }
+        }
+      });
+    }
+
+    if (this.backdropScrim) {
+      this.backdropScrim.addEventListener("click", () => {
+        if (!state.ftueCompleted && state.ftueStep >= 4) {
+          state.completeFtue();
         }
       });
     }
@@ -52,12 +75,20 @@ export class TutorialManager {
       });
     }
 
+    const questInfo = document.getElementById("quest-title-marquee-wrapper") || this.questBanner;
+    if (questInfo) {
+      questInfo.style.cursor = "pointer";
+      questInfo.addEventListener("click", (e) => {
+        if (e.target.closest("#btn-claim-quest") || e.target.closest("#btn-open-savelich")) return;
+        this.navigateActiveQuestTarget();
+      });
+    }
+
     if (this.btnUpgradeSavelich) {
       this.btnUpgradeSavelich.addEventListener("click", () => {
         if (state.upgradeSavelich()) {
           this.updateSavelichModal();
           this.updateQuestBanner();
-          this.hideHand();
         }
       });
     }
@@ -68,50 +99,306 @@ export class TutorialManager {
       });
     }
 
-    // Dismiss hand on any user pointer down
-    window.addEventListener("pointerdown", () => {
-      this.hideHand();
-    }, { passive: true });
-
-    if (this.handPointer) {
-      this.handPointer.addEventListener("click", () => {
-        this.hideHand();
+    // FTUE Primary Action Button
+    if (this.btnFtueAction) {
+      this.btnFtueAction.addEventListener("click", () => {
+        const step = state.ftueStep || 0;
+        if (step === 0) {
+          state.grantFtueStartingFund(250000);
+          state.advanceFtueStep(1);
+        } else if (step === 3) {
+          state.claimQuestReward();
+          state.completeFtue();
+        } else if (step >= 4) {
+          state.completeFtue();
+        }
       });
     }
 
+    // FTUE Skip Button
+    if (this.btnFtueSkip) {
+      this.btnFtueSkip.addEventListener("click", () => {
+        state.skipFtue();
+      });
+    }
+
+    // React to game state events
+    state.on("ftueStepChanged", () => {
+      this.updateFtueFlow();
+      this.updateQuestBanner();
+    });
+
+    state.on("ftueCompleted", () => {
+      this.updateFtueFlow();
+      this.updateQuestBanner();
+    });
+
     state.on("questProgress", () => {
       this.updateQuestBanner();
-      this.updateHandPointer();
+      if (!state.ftueCompleted) this.updateFtueFlow();
     });
 
     state.on("questClaimed", () => {
       this.updateQuestBanner();
-      this.updateHandPointer();
+      if (!state.ftueCompleted && (state.ftueStep === 3 || state.ftueStep === 4)) {
+        state.completeFtue();
+      }
+    });
+
+    state.on("wellUpgraded", ({ wellId }) => {
+      if (!state.ftueCompleted && state.ftueStep === 2 && wellId === "well_1") {
+        if (this.dialogCard) this.dialogCard.classList.remove("dock-top");
+        state.emit("closeAllBottomSheets");
+        state.advanceFtueStep(3);
+      }
+    });
+
+    state.on("wellSheetClosed", () => {
+      if (!state.ftueCompleted && state.ftueStep === 2) {
+        if (this.dialogCard) this.dialogCard.classList.remove("dock-top");
+        this.updateFtueFlow();
+      }
+    });
+
+    state.on("openWellUpgradeSheet", ({ wellId }) => {
+      if (!state.ftueCompleted && (state.ftueStep === 1 || state.ftueStep === 0) && wellId === "well_1") {
+        state.advanceFtueStep(2);
+      } else if (!state.ftueCompleted && state.ftueStep === 2) {
+        this.updateFtueFlow();
+      }
     });
 
     state.on("savelichUpgraded", () => {
       this.updateSavelichModal();
-      this.hideHand();
     });
 
     state.on("moneyChanged", () => {
       this.updateSavelichModal();
     });
 
-    state.on("openWellUpgradeSheet", () => {
-      if (!state.tutorialCompleted && state.currentQuestIndex === 1) {
-        this.positionHandOnElement("btn-sheet-upgrade");
-      } else {
-        this.hideHand();
+    state.on("specializationAvailable", () => {
+      if (this.spotlightContainer) this.spotlightContainer.classList.add("hidden");
+      this.hideHand();
+    });
+
+    state.on("specializationChanged", () => {
+      if (!state.ftueCompleted) {
+        if (this.spotlightContainer) this.spotlightContainer.classList.remove("hidden");
+        this.updateFtueFlow();
       }
     });
 
-    // Hide hand on ANY modal opening
-    ["openWorldMap", "openBlockBlastModal", "openCryptoActivationModal", "openIpoModal", "openMarketplaceModal", "openCompanyStockModal", "openStructureUpgradeSheet"].forEach(evt => {
-      state.on(evt, () => {
-        this.hideHand();
+    if (typeof window !== "undefined") {
+      window.addEventListener("resize", () => {
+        if (!state.ftueCompleted && state.ftueStep === 1) {
+          this.positionSpotlightOnWell("well_1");
+        } else if (!state.ftueCompleted && (state.ftueStep === 2 || state.ftueStep === 3)) {
+          this.updateFtueFlow();
+        }
       });
-    });
+    }
+  }
+
+  updateFtueFlow() {
+    if (state.ftueCompleted) {
+      if (this.dialogCard) {
+        this.dialogCard.classList.remove("dock-top", "center-modal");
+        this.dialogCard.classList.add("hidden");
+      }
+      if (this.backdropScrim) {
+        this.backdropScrim.classList.remove("active");
+        this.backdropScrim.style.pointerEvents = "none";
+      }
+      if (this.spotlightContainer) this.spotlightContainer.classList.add("hidden");
+      if (this.spotlightHole) this.spotlightHole.style.opacity = "0";
+      this.hideHand();
+      if (typeof window !== "undefined") {
+        if (window.engine3D?.controls) window.engine3D.controls.enabled = true;
+        if (window.__gameApp?.canvasView?.engine3D?.controls) window.__gameApp.canvasView.engine3D.controls.enabled = true;
+      }
+      return;
+    }
+
+    const step = state.ftueStep || 0;
+    if (this.spotlightContainer) this.spotlightContainer.classList.remove("hidden");
+
+    switch (step) {
+      case 0:
+        if (this.dialogCard) {
+          this.dialogCard.classList.remove("dock-top", "hidden");
+          this.dialogCard.classList.add("center-modal");
+        }
+        if (this.backdropScrim) {
+          this.backdropScrim.classList.add("active");
+          this.backdropScrim.style.pointerEvents = "auto";
+        }
+        if (this.spotlightHole) {
+          this.spotlightHole.style.opacity = "0";
+        }
+        if (this.speakerName) this.speakerName.textContent = "Мастер цеха Савельич";
+        if (this.stepBadge) this.stepBadge.textContent = "Инструктаж • Шаг 1/4";
+        if (this.dialogText) {
+          this.dialogText.innerHTML = "Приветствую на Ямале, начальник! Я — Савельич, мастер цеха по добыче нефти и газа. Вечная мерзлота шуток не любит. Держи подъёмную субсидию <strong>250 000 ₽</strong> от округа. Давай разбурим первую эксплуатационную скважину!";
+        }
+        if (this.btnFtueAction) {
+          this.btnFtueAction.classList.remove("hidden");
+          if (this.ftueActionText) this.ftueActionText.textContent = "В РАБОТУ! ➔";
+        }
+        this.hideHand();
+        break;
+
+      case 1:
+        if (this.dialogCard) this.dialogCard.classList.remove("dock-top", "center-modal", "hidden");
+        if (this.backdropScrim) {
+          this.backdropScrim.classList.remove("active");
+          this.backdropScrim.style.pointerEvents = "none";
+        }
+        if (this.stepBadge) this.stepBadge.textContent = "Инструктаж • Шаг 2/4";
+        if (this.dialogText) {
+          this.dialogText.innerHTML = "Жми прямо на <strong>Скважину №1</strong> на кустовой площадке, чтобы подготовить станок к разбуриванию!";
+        }
+        if (this.btnFtueAction) {
+          this.btnFtueAction.classList.add("hidden");
+        }
+        this.positionSpotlightOnWell("well_1");
+        if (typeof window !== "undefined") {
+          if (window.engine3D?.controls) window.engine3D.controls.enabled = true;
+          if (window.__gameApp?.canvasView?.engine3D?.controls) window.__gameApp.canvasView.engine3D.controls.enabled = true;
+        }
+        break;
+
+      case 2: {
+        // Auto-advance if player already drilled Well 1 (level >= 1)
+        if ((state.wells?.well_1?.level || 0) >= 1) {
+          if (this.dialogCard) this.dialogCard.classList.remove("dock-top", "center-modal");
+          if (this.backdropScrim) {
+            this.backdropScrim.classList.remove("active");
+            this.backdropScrim.style.pointerEvents = "none";
+          }
+          state.emit("closeAllBottomSheets");
+          state.advanceFtueStep(3);
+          return;
+        }
+
+        const wellSheet = document.getElementById("well-upgrade-sheet");
+        const isSheetOpen = wellSheet && !wellSheet.classList.contains("hidden") && !wellSheet.classList.contains("sliding-down");
+
+        if (this.dialogCard) this.dialogCard.classList.remove("center-modal", "hidden");
+        if (this.backdropScrim) {
+          this.backdropScrim.classList.remove("active");
+          this.backdropScrim.style.pointerEvents = "none";
+        }
+
+        if (this.stepBadge) this.stepBadge.textContent = "Инструктаж • Шаг 3/4";
+        if (this.dialogText) {
+          this.dialogText.innerHTML = "Отлично! Теперь жми <strong>«РАЗБУРИТЬ СКВАЖИНУ»</strong>, чтобы забуриться в продуктивный пласт и получить первый фонтан!";
+        }
+        if (this.btnFtueAction) {
+          this.btnFtueAction.classList.add("hidden");
+        }
+
+        if (isSheetOpen) {
+          if (this.dialogCard) this.dialogCard.classList.add("dock-top");
+          this.positionSpotlightOnElement("btn-sheet-upgrade", true);
+          setTimeout(() => {
+            if (!state.ftueCompleted && state.ftueStep === 2) {
+              this.positionSpotlightOnElement("btn-sheet-upgrade", true);
+            }
+          }, 260);
+        } else {
+          if (this.dialogCard) this.dialogCard.classList.remove("dock-top");
+          // If sheet was accidentally closed, guide player back to Well 1
+          this.positionSpotlightOnWell("well_1");
+        }
+        break;
+      }
+
+      case 3:
+        if (this.dialogCard) this.dialogCard.classList.remove("dock-top", "center-modal", "hidden");
+        if (this.backdropScrim) {
+          this.backdropScrim.classList.remove("active");
+          this.backdropScrim.style.pointerEvents = "none";
+        }
+        if (this.stepBadge) this.stepBadge.textContent = "Инструктаж • Шаг 4/4";
+        if (this.dialogText) {
+          this.dialogText.innerHTML = "Пошла нефть под давлением! Забирай премию за ввод скважины <strong>500 000 ₽</strong> в верхнем баннере или жми кнопку ниже!";
+        }
+        if (this.btnFtueAction) {
+          this.btnFtueAction.classList.remove("hidden");
+          if (this.ftueActionText) this.ftueActionText.textContent = "🎁 ЗАБРАТЬ 500 000 ₽";
+        }
+        this.positionSpotlightOnElement("btn-claim-quest", true);
+        if (typeof window !== "undefined") {
+          if (window.engine3D?.controls) window.engine3D.controls.enabled = true;
+          if (window.__gameApp?.canvasView?.engine3D?.controls) window.__gameApp.canvasView.engine3D.controls.enabled = true;
+        }
+        break;
+
+      case 4:
+        state.completeFtue();
+        break;
+
+      default:
+        if (this.dialogCard) this.dialogCard.classList.remove("dock-top", "center-modal");
+        if (this.backdropScrim) {
+          this.backdropScrim.classList.remove("active");
+          this.backdropScrim.style.pointerEvents = "none";
+        }
+        if (this.spotlightContainer) this.spotlightContainer.classList.add("hidden");
+        this.hideHand();
+        break;
+    }
+  }
+
+  positionSpotlightOnElement(elementId, isPill = false) {
+    const el = document.getElementById(elementId);
+    if (!el || !this.spotlightHole) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+
+    this.spotlightHole.style.opacity = "1";
+    this.spotlightHole.style.left = `${Math.round(rect.left + rect.width / 2)}px`;
+    this.spotlightHole.style.top = `${Math.round(rect.top + rect.height / 2)}px`;
+    this.spotlightHole.style.width = `${Math.round(rect.width + 16)}px`;
+    this.spotlightHole.style.height = `${Math.round(rect.height + 16)}px`;
+    if (isPill) {
+      this.spotlightHole.classList.add("pill-shape");
+    } else {
+      this.spotlightHole.classList.remove("pill-shape");
+    }
+    this.positionHandOnCoords(rect.left + rect.width / 2, rect.top + rect.height / 2);
+  }
+
+  positionSpotlightOnWell(wellId = "well_1") {
+    let screenPos = null;
+    if (typeof window !== "undefined" && window.engine3D && typeof window.engine3D.getWellScreenPosition === "function") {
+      screenPos = window.engine3D.getWellScreenPosition(wellId);
+    }
+    const x = screenPos?.x ?? (typeof window !== "undefined" ? window.innerWidth * 0.45 : 300);
+    const y = screenPos?.y ?? (typeof window !== "undefined" ? window.innerHeight * 0.45 : 300);
+
+    if (this.spotlightHole) {
+      this.spotlightHole.style.opacity = "1";
+      this.spotlightHole.style.left = `${Math.round(x)}px`;
+      this.spotlightHole.style.top = `${Math.round(y)}px`;
+      this.spotlightHole.style.width = "110px";
+      this.spotlightHole.style.height = "110px";
+      this.spotlightHole.classList.remove("pill-shape");
+    }
+    this.positionHandOnCoords(x, y);
+  }
+
+  positionHandOnCoords(x, y) {
+    if (!this.handPointer) return;
+    this.handPointer.classList.remove("hidden");
+    this.handPointer.style.left = `${Math.round(x)}px`;
+    this.handPointer.style.top = `${Math.round(y)}px`;
+  }
+
+  hideHand() {
+    if (this.handPointer) {
+      this.handPointer.classList.add("hidden");
+    }
   }
 
   updateQuestBanner() {
@@ -124,7 +411,6 @@ export class TutorialManager {
         if (this.questProgressFill) this.questProgressFill.style.width = "100%";
         if (this.btnClaimQuest) this.btnClaimQuest.classList.add("hidden");
       }
-      this.hideHand();
       return;
     }
 
@@ -138,19 +424,19 @@ export class TutorialManager {
 
       if (isLong) {
         const overflow = Math.max(40, textWidth - containerWidth + 16);
-        this.questTitle.style.setProperty('--marquee-distance', `-${overflow}px`);
-        this.questTitle.classList.add('marquee-active');
-        if (this.questTitleTrack) this.questTitleTrack.classList.add('marquee-running');
-        if (this.questTitleSep1) this.questTitleSep1.style.display = 'inline';
-        if (this.questTitleSep2) this.questTitleSep2.style.display = 'inline';
-        if (this.questTitleClone) this.questTitleClone.style.display = 'inline-block';
+        this.questTitle.style.setProperty("--marquee-distance", `-${overflow}px`);
+        this.questTitle.classList.add("marquee-active");
+        if (this.questTitleTrack) this.questTitleTrack.classList.add("marquee-running");
+        if (this.questTitleSep1) this.questTitleSep1.style.display = "inline";
+        if (this.questTitleSep2) this.questTitleSep2.style.display = "inline";
+        if (this.questTitleClone) this.questTitleClone.style.display = "inline-block";
       } else {
-        this.questTitle.classList.remove('marquee-active');
-        this.questTitle.style.removeProperty('--marquee-distance');
-        if (this.questTitleTrack) this.questTitleTrack.classList.remove('marquee-running');
-        if (this.questTitleSep1) this.questTitleSep1.style.display = 'none';
-        if (this.questTitleSep2) this.questTitleSep2.style.display = 'none';
-        if (this.questTitleClone) this.questTitleClone.style.display = 'none';
+        this.questTitle.classList.remove("marquee-active");
+        this.questTitle.style.removeProperty("--marquee-distance");
+        if (this.questTitleTrack) this.questTitleTrack.classList.remove("marquee-running");
+        if (this.questTitleSep1) this.questTitleSep1.style.display = "none";
+        if (this.questTitleSep2) this.questTitleSep2.style.display = "none";
+        if (this.questTitleClone) this.questTitleClone.style.display = "none";
       }
     }
     if (this.questCounter) this.questCounter.textContent = `${q.current || 0}/${q.target}`;
@@ -175,7 +461,7 @@ export class TutorialManager {
   }
 
   openSavelichModal() {
-    this.hideHand();
+    state.emit("closeAllBottomSheets");
     this.updateSavelichModal();
     if (this.modalSavelich) {
       this.modalSavelich.classList.remove("hidden");
@@ -215,92 +501,41 @@ export class TutorialManager {
     }
   }
 
-  hasOpenModal() {
-    if (typeof document === "undefined") return false;
-    const modals = document.querySelectorAll(".modal-backdrop:not(.hidden)");
-    return modals.length > 0;
-  }
-
-  updateHandPointer() {
-    if (state.tutorialCompleted || this.hasOpenModal()) {
-      this.hideHand();
-      return;
-    }
-
+  navigateActiveQuestTarget() {
     const q = state.getCurrentQuest();
-    if (!q) {
-      this.hideHand();
-      return;
+    if (!q || q.completed) return;
+    if (audio && typeof audio.playTap === "function") {
+      audio.playTap();
     }
 
-    if (q.completed) {
-      this.positionHandOnElement("btn-claim-quest");
-      return;
-    }
-
-    if (q.id === "harvest_passive" || q.id === "tap_well") {
-      this.positionHandOnCoords(window.innerWidth * 0.45, window.innerHeight * 0.45);
-    } else if (q.id === "upgrade_well") {
-      const wellSheet = document.getElementById("well-upgrade-sheet");
-      if (wellSheet && !wellSheet.classList.contains("hidden")) {
-        this.positionHandOnElement("btn-sheet-upgrade");
-      }
-    } else if (q.id === "upgrade_savelich") {
-      const savModal = document.getElementById("modal-savelich-upgrade");
-      if (savModal && !savModal.classList.contains("hidden")) {
-        this.positionHandOnElement("btn-upgrade-savelich");
-      } else {
-        this.positionHandOnElement("btn-open-savelich");
-      }
-    } else {
-      this.hideHand();
-    }
-  }
-
-  positionHandOnElement(elementId) {
-    if (this.hasOpenModal() && elementId !== "btn-upgrade-savelich") {
-      this.hideHand();
-      return;
-    }
-
-    const el = document.getElementById(elementId);
-    if (!el || !this.handPointer) {
-      this.hideHand();
-      return;
-    }
-
-    const rect = el.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) {
-      this.hideHand();
-      return;
-    }
-
-    const targetX = rect.left + rect.width * 0.5;
-    const targetY = rect.top + rect.height * 0.5;
-    this.positionHandOnCoords(targetX, targetY);
-  }
-
-  positionHandOnCoords(x, y) {
-    if (!this.handPointer) return;
-    if (this._handTimer) clearTimeout(this._handTimer);
-
-    this.handPointer.classList.remove("hidden");
-    this.handPointer.style.left = `${Math.round(x)}px`;
-    this.handPointer.style.top = `${Math.round(y)}px`;
-
-    // Automatically hide after 6 seconds so it NEVER lingers indefinitely
-    this._handTimer = setTimeout(() => {
-      this.hideHand();
-    }, 6000);
-  }
-
-  hideHand() {
-    if (this._handTimer) {
-      clearTimeout(this._handTimer);
-      this._handTimer = null;
-    }
-    if (this.handPointer) {
-      this.handPointer.classList.add("hidden");
+    switch (q.id) {
+      case "upgrade_well":
+        state.emit("openWellUpgradeSheet", { wellId: state.activeWellId || "well_1" });
+        break;
+      case "upgrade_substation":
+        state.emit("openStructureUpgradeSheet", {
+          type: "substation",
+          name: "КТПН 10/0.4 кВ и ЛЭП",
+          badge: "⚡ ЭНЕРГОСЕТЬ"
+        });
+        break;
+      case "upgrade_garage":
+        state.emit("openGarageUpgradeSheet");
+        break;
+      case "upgrade_canteen":
+        state.emit("openCanteenUpgradeSheet");
+        break;
+      case "upgrade_savelich":
+        this.openSavelichModal();
+        break;
+      case "block_blast":
+        state.emit("openBlockBlastModal", { wellId: state.activeWellId || "well_1" });
+        break;
+      case "world_map":
+        state.emit("openWorldMap");
+        break;
+      default:
+        break;
     }
   }
 }

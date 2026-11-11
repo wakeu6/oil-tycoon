@@ -165,7 +165,7 @@ export class SavelichAgent {
     this.speechAlpha = 1;
 
     // 4. Trigger HUD advisor tip as well
-    state.triggerAdvisorTip("savelich_field", "Прораб Савельич", quote);
+    state.triggerAdvisorTip("savelich_field", "Мастер цеха Савельич", quote);
 
     // 5. Check Micro-bonus opportunity
     const now = Date.now() / 1000;

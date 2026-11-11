@@ -67,6 +67,13 @@ export class WorldMapView {
 
   open() {
     if (!this.modal) return;
+    state.emit("closeAllBottomSheets", { immediate: true });
+    if (typeof document !== "undefined") {
+      document.querySelectorAll(".well-upgrade-sheet").forEach(s => {
+        s.classList.remove("sliding-down");
+        s.classList.add("hidden");
+      });
+    }
     this.modal.classList.remove("hidden");
     this.updateTopStats();
     this.renderPins();

@@ -78,6 +78,7 @@ export class MegaprojectModalView {
 
   open() {
     if (!this.modal) return;
+    this.state?.emit?.("closeAllBottomSheets");
     this.modal.classList.remove("hidden");
     this.modal.classList.add("entering");
     this.isOpen = true;

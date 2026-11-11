@@ -256,6 +256,39 @@ class AudioManager {
     });
   }
 
+  playShipHorn() {
+    if (this.isEffectivelyMuted || !this.ctx) return;
+    this.unlock();
+    const now = this.ctx.currentTime;
+    const dest = this.getOutputNode();
+
+    // Deep Arctic maritime icebreaker horn (D2 ~73.4Hz & F#2 ~92.5Hz with harmonics)
+    const freqs = [73.4, 92.5, 146.8];
+    freqs.forEach((f, idx) => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const filter = this.ctx.createBiquadFilter();
+
+      osc.type = idx === 0 ? "sawtooth" : "triangle";
+      osc.frequency.setValueAtTime(f, now);
+
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(320, now);
+
+      gain.gain.setValueAtTime(0.001, now);
+      gain.gain.linearRampToValueAtTime(idx === 0 ? 0.22 : 0.14, now + 0.15);
+      gain.gain.setValueAtTime(idx === 0 ? 0.22 : 0.14, now + 0.85);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(dest);
+
+      osc.start(now);
+      osc.stop(now + 1.4);
+    });
+  }
+
   playUpgrade() {
     if (this.isEffectivelyMuted || !this.ctx) return;
     this.unlock();

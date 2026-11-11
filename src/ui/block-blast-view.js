@@ -50,6 +50,7 @@ export class BlockBlastView {
 
   open(wellId) {
     if (!this.modal) return;
+    state.emit("closeAllBottomSheets");
     this.engine = new PipelineBlockBlast({ wellId });
     this.selectedDockIndex = null;
     this.modal.classList.remove("hidden");
